@@ -96,6 +96,7 @@ class ModernLogHighlighter(QSyntaxHighlighter):
         self.search_pattern = None
         self.compiled_rules = []
         self.user_keyword_rules = []  # 用户关键词高亮规则
+        self._dirty_blocks = set()  # 需要重新高亮的 block
         self.apply_template(template)
 
     def apply_template(self, template: Optional[HighlightTemplate]):
@@ -160,7 +161,7 @@ class ModernLogHighlighter(QSyntaxHighlighter):
         else:
             self.search_pattern = None
 
-    def set_user_keywords(self, keywords: list):
+    def set_user_keywords(self, keywords: list, mark_dirty: bool = True):
         """设置用户关键词高亮规则"""
         import re
         self.user_keyword_rules = []
@@ -178,6 +179,10 @@ class ModernLogHighlighter(QSyntaxHighlighter):
                 self.user_keyword_rules.append((kw.keyword, pattern, fmt))
             except re.error:
                 pass
+
+        # 标记所有 block 为脏（需要重新高亮）
+        if mark_dirty:
+            self._needs_full_rehighlight = True
 
     def highlightBlock(self, text: str):
         """高亮单行文本"""
@@ -448,6 +453,9 @@ class MainWindow(QMainWindow):
         self.main_log_viewer.viewport().installEventFilter(self)  # 监听鼠标释放
         self._selection_highlight_word = None  # 当前选中高亮的词
         self._is_selecting = False  # 是否正在拖动选择
+
+        # 监听滚动事件，更新关键词高亮
+        self.main_log_viewer.verticalScrollBar().valueChanged.connect(self._on_scroll_update_highlights)
 
         main_viewer_layout.addWidget(self.main_log_viewer)
 
@@ -1185,72 +1193,91 @@ class MainWindow(QMainWindow):
         self.keyword_highlight_manager.remove_keyword(keyword)
 
     def _on_keyword_highlight_changed(self):
-        """关键词高亮变化回调 - 异步分块刷新避免 UI 卡死"""
+        """关键词高亮变化回调 - 使用 ExtraSelections 实现，不调用 rehighlight"""
         keywords = self.keyword_highlight_manager.get_enabled_keywords()
 
-        # 更新主高亮器规则
+        # 更新高亮器规则（用于新加载的文件）
         if self.highlighter:
-            self.highlighter.set_user_keywords(keywords)
+            self.highlighter.set_user_keywords(keywords, mark_dirty=False)
 
-        # 更新所有 Grep 标签页的高亮器规则
+        # 使用 ExtraSelections 实现高亮（不卡顿）
+        self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
+
+        # 更新所有 Grep 标签页
         for tab_info in self.grep_tabs.values():
-            if tab_info.get("highlighter"):
-                tab_info["highlighter"].set_user_keywords(keywords)
+            hl = tab_info.get("highlighter")
+            viewer = tab_info.get("viewer")
+            if hl:
+                hl.set_user_keywords(keywords, mark_dirty=False)
+            if viewer:
+                self._apply_keyword_extra_selections(viewer, keywords)
 
-        # 异步分块刷新整个文档
-        QTimer.singleShot(10, self._async_rehighlight_all)
-
-    def _async_rehighlight_all(self):
-        """异步分块刷新所有高亮 - 避免大文件卡死"""
-        if not self.highlighter:
+    def _apply_keyword_extra_selections(self, viewer, keywords):
+        """使用 ExtraSelections 应用关键词高亮 - 仅可见区域"""
+        if not viewer or not keywords:
+            viewer.setExtraSelections([]) if viewer else None
             return
 
-        doc = self.main_log_viewer.document()
-        total_blocks = doc.blockCount()
+        import re
+        selections = []
+        doc = viewer.document()
 
-        # 小文件（<3000行）直接全量刷新
-        if total_blocks < 3000:
-            self.highlighter.rehighlight()
-            for tab_info in self.grep_tabs.values():
-                if tab_info.get("highlighter"):
-                    tab_info["highlighter"].rehighlight()
+        # 只处理可见区域的文本块
+        cursor_top = viewer.cursorForPosition(viewer.viewport().rect().topLeft())
+        cursor_bottom = viewer.cursorForPosition(viewer.viewport().rect().bottomRight())
+        start_block = cursor_top.block()
+        end_block = cursor_bottom.block()
+
+        # 预编译所有关键词模式
+        kw_patterns = []
+        for kw in keywords:
+            if not kw.enabled:
+                continue
+            try:
+                pattern = re.compile(re.escape(kw.keyword), re.IGNORECASE)
+                kw_patterns.append((pattern, kw.fg_color, kw.bg_color, kw.bold))
+            except re.error:
+                pass
+
+        if not kw_patterns:
+            viewer.setExtraSelections([])
             return
 
-        # 大文件：分块刷新，每次处理 500 个 block
-        self._rehighlight_chunk_start = 0
-        self._rehighlight_chunk_size = 500
-        self._rehighlight_in_progress = True
-        self._process_rehighlight_chunk()
+        # 遍历可见的 block
+        block = start_block
+        while block.isValid():
+            text = block.text()
+            block_pos = block.position()
 
-    def _process_rehighlight_chunk(self):
-        """处理一个分块的 rehighlight"""
-        if not self._rehighlight_in_progress or not self.highlighter:
-            return
+            for pattern, fg, bg, bold in kw_patterns:
+                for match in pattern.finditer(text):
+                    selection = QTextEdit.ExtraSelection()
+                    cursor = QTextCursor(doc)
+                    cursor.setPosition(block_pos + match.start())
+                    cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
 
-        doc = self.main_log_viewer.document()
-        total_blocks = doc.blockCount()
-        start = self._rehighlight_chunk_start
-        end = min(start + self._rehighlight_chunk_size, total_blocks)
+                    fmt = QTextCharFormat()
+                    fmt.setForeground(QColor(fg))
+                    if bg:
+                        fmt.setBackground(QColor(bg))
+                    if bold:
+                        fmt.setFontWeight(QFont.Bold)
 
-        # 处理当前分块
-        block = doc.findBlockByNumber(start)
-        for _ in range(end - start):
-            if block.isValid():
-                self.highlighter.rehighlightBlock(block)
-                block = block.next()
+                    selection.cursor = cursor
+                    selection.format = fmt
+                    selections.append(selection)
 
-        # 更新进度
-        self._rehighlight_chunk_start = end
+            if block == end_block:
+                break
+            block = block.next()
 
-        # 继续处理下一个分块，或完成
-        if end < total_blocks:
-            QTimer.singleShot(5, self._process_rehighlight_chunk)
-        else:
-            self._rehighlight_in_progress = False
-            # 刷新 Grep 标签页
-            for tab_info in self.grep_tabs.values():
-                if tab_info.get("highlighter"):
-                    tab_info["highlighter"].rehighlight()
+        viewer.setExtraSelections(selections)
+
+    def _on_scroll_update_highlights(self):
+        """滚动时更新可见区域的高亮"""
+        keywords = self.keyword_highlight_manager.get_enabled_keywords()
+        if keywords:
+            self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
 
     def show_highlight_panel(self):
         """显示高亮管理面板"""
