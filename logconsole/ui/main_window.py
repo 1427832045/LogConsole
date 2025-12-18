@@ -432,10 +432,9 @@ class MainWindow(QMainWindow):
         self.results_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.results_tree.customContextMenuRequested.connect(self.show_results_context_menu)
         self.results_tree.setItemDelegate(HighlightDelegate(self.results_tree))
-        # 单击即可展开/折叠（配合文本箭头）
-        self.results_tree.itemClicked.connect(self._on_tree_item_clicked)
         self.results_tree.setRootIsDecorated(False)  # 隐藏原生箭头，使用文本箭头
         self.results_tree.setIndentation(16)  # 保留层级缩进
+        self.results_tree.setAnimated(True)  # 启用展开/折叠动画
         self.results_tree.hide()
         splitter.addWidget(self.results_tree)
 
@@ -841,24 +840,32 @@ class MainWindow(QMainWindow):
         if not hasattr(self, '_tree_signals_connected'):
             self.results_tree.itemExpanded.connect(self._on_tree_item_expanded)
             self.results_tree.itemCollapsed.connect(self._on_tree_item_collapsed)
+            self.results_tree.itemClicked.connect(self._on_tree_item_clicked)
             self._tree_signals_connected = True
 
     def _on_tree_item_expanded(self, item: QTreeWidgetItem):
         """树节点展开时更新文本箭头"""
-        text = item.text(0)
-        if text.startswith("▶"):
-            item.setText(0, "▼" + text[1:])
+        self._update_item_arrow(item, expanded=True)
 
     def _on_tree_item_collapsed(self, item: QTreeWidgetItem):
         """树节点折叠时更新文本箭头"""
+        self._update_item_arrow(item, expanded=False)
+
+    def _update_item_arrow(self, item: QTreeWidgetItem, expanded: bool):
+        """更新节点的箭头图标"""
         text = item.text(0)
-        if text.startswith("▼"):
-            item.setText(0, "▶" + text[1:])
+        old_arrow = "▶" if expanded else "▼"
+        new_arrow = "▼" if expanded else "▶"
+        if text.startswith(old_arrow):
+            item.setText(0, new_arrow + text[1:])
 
     def _on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
         """单击节点时切换展开/折叠状态（仅对有子节点的项）"""
         if item.childCount() > 0:
             item.setExpanded(not item.isExpanded())
+        else:
+            # 叶子节点：触发跳转
+            self.on_result_double_clicked(item, column)
 
     def _highlight_match_in_item(self, item: QTreeWidgetItem, query: str):
         """在树节点中高亮匹配词（使用 HTML 富文本，仅高亮匹配部分）"""
