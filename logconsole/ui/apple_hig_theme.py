@@ -339,7 +339,7 @@ def get_combobox_style():
 
 
 def get_tree_widget_style():
-    """树形控件 - 搜索结果 (极简风格)"""
+    """树形控件 - 搜索结果 (极简风格，原生折叠箭头)"""
     return f"""
         QTreeWidget {{
             background: {APPLE_COLORS['bg_surface']};
@@ -365,13 +365,24 @@ def get_tree_widget_style():
         QTreeWidget::branch {{
             background: transparent;
         }}
-        QTreeWidget::branch:has-children:closed {{
-            image: url(none);
+        QTreeWidget::branch:has-siblings:!adjoins-item {{
             border-image: none;
         }}
-        QTreeWidget::branch:has-children:open {{
-            image: url(none);
+        QTreeWidget::branch:has-siblings:adjoins-item {{
             border-image: none;
+        }}
+        QTreeWidget::branch:!has-children:!has-siblings:adjoins-item {{
+            border-image: none;
+        }}
+        QTreeWidget::branch:has-children:!has-siblings:closed,
+        QTreeWidget::branch:closed:has-children:has-siblings {{
+            border-image: none;
+            image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMyAyTDcgNUwzIDgiIHN0cm9rZT0iI0ExQTFBNiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==);
+        }}
+        QTreeWidget::branch:open:has-children:!has-siblings,
+        QTreeWidget::branch:open:has-children:has-siblings {{
+            border-image: none;
+            image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMiAzTDUgN0w4IDMiIHN0cm9rZT0iI0ExQTFBNiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==);
         }}
         QHeaderView::section {{
             background: {APPLE_COLORS['bg_surface']};

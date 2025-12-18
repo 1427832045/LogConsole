@@ -773,8 +773,8 @@ class MainWindow(QMainWindow):
             total_matches = search_result["total_matches"]
             search_id = search_result["search_id"]
 
-            # L1: 搜索词节点 - 带折叠箭头
-            l1_text = f"▼ \"{query}\" · {total_matches}"
+            # L1: 搜索词节点
+            l1_text = f"\"{query}\" · {total_matches}"
             l1_item = QTreeWidgetItem([l1_text])
             l1_item.setData(0, Qt.UserRole, {"type": "search", "search_id": search_id})
             l1_item.setForeground(0, QColor(APPLE_COLORS['text_primary']))
@@ -787,7 +787,7 @@ class MainWindow(QMainWindow):
                 lines = file_result["lines"]
 
                 # L2: 文件节点
-                l2_text = f"▼ {filename} · {len(matches)}"
+                l2_text = f"{filename} · {len(matches)}"
                 l2_item = QTreeWidgetItem([l2_text])
                 l2_item.setData(0, Qt.UserRole, {
                     "type": "file",
@@ -830,16 +830,12 @@ class MainWindow(QMainWindow):
             self._tree_signals_connected = True
 
     def _on_tree_item_expanded(self, item: QTreeWidgetItem):
-        """树节点展开时更新箭头"""
-        text = item.text(0)
-        if text.startswith("▶"):
-            item.setText(0, "▼" + text[1:])
+        """树节点展开时的处理"""
+        self._adjust_results_tree_height()
 
     def _on_tree_item_collapsed(self, item: QTreeWidgetItem):
-        """树节点折叠时更新箭头"""
-        text = item.text(0)
-        if text.startswith("▼"):
-            item.setText(0, "▶" + text[1:])
+        """树节点折叠时的处理"""
+        self._adjust_results_tree_height()
 
     def _highlight_match_in_item(self, item: QTreeWidgetItem, query: str):
         """在树节点中高亮匹配词（使用 HTML 富文本，仅高亮匹配部分）"""
