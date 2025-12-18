@@ -1146,7 +1146,8 @@ class MainWindow(QMainWindow):
             self.highlighter.set_user_keywords(keywords, mark_dirty=False)
 
         # 使用 ExtraSelections 实现高亮（不卡顿）
-        self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
+        # 延迟一帧执行，确保菜单已关闭，viewport 已更新
+        QTimer.singleShot(0, lambda: self._apply_keyword_extra_selections(self.main_log_viewer, keywords))
 
         # 更新所有 Grep 标签页
         for tab_info in self.grep_tabs.values():
@@ -1155,23 +1156,21 @@ class MainWindow(QMainWindow):
             if hl:
                 hl.set_user_keywords(keywords, mark_dirty=False)
             if viewer:
-                self._apply_keyword_extra_selections(viewer, keywords)
+                QTimer.singleShot(0, lambda v=viewer, k=keywords: self._apply_keyword_extra_selections(v, k))
 
     def _apply_keyword_extra_selections(self, viewer, keywords):
-        """使用 ExtraSelections 应用关键词高亮 - 仅可见区域"""
-        if not viewer or not keywords:
-            viewer.setExtraSelections([]) if viewer else None
+        """使用 ExtraSelections 应用关键词高亮 - 全文档搜索"""
+        if not viewer:
+            return
+
+        if not keywords:
+            viewer.setExtraSelections([])
             return
 
         import re
         selections = []
         doc = viewer.document()
-
-        # 只处理可见区域的文本块
-        cursor_top = viewer.cursorForPosition(viewer.viewport().rect().topLeft())
-        cursor_bottom = viewer.cursorForPosition(viewer.viewport().rect().bottomRight())
-        start_block = cursor_top.block()
-        end_block = cursor_bottom.block()
+        total_blocks = doc.blockCount()
 
         # 预编译所有关键词模式
         kw_patterns = []
@@ -1188,41 +1187,77 @@ class MainWindow(QMainWindow):
             viewer.setExtraSelections([])
             return
 
-        # 遍历可见的 block
-        block = start_block
-        while block.isValid():
-            text = block.text()
-            block_pos = block.position()
+        # 小文件：全文档搜索
+        # 大文件：仅可见区域 + 缓冲区
+        if total_blocks < 5000:
+            # 全文档搜索
+            block = doc.begin()
+            while block.isValid():
+                text = block.text()
+                block_pos = block.position()
 
-            for pattern, fg, bg, bold in kw_patterns:
-                for match in pattern.finditer(text):
-                    selection = QTextEdit.ExtraSelection()
-                    cursor = QTextCursor(doc)
-                    cursor.setPosition(block_pos + match.start())
-                    cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
+                for pattern, fg, bg, bold in kw_patterns:
+                    for match in pattern.finditer(text):
+                        selection = QTextEdit.ExtraSelection()
+                        cursor = QTextCursor(doc)
+                        cursor.setPosition(block_pos + match.start())
+                        cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
 
-                    fmt = QTextCharFormat()
-                    fmt.setForeground(QColor(fg))
-                    if bg:
-                        fmt.setBackground(QColor(bg))
-                    if bold:
-                        fmt.setFontWeight(QFont.Bold)
+                        fmt = QTextCharFormat()
+                        fmt.setForeground(QColor(fg))
+                        if bg:
+                            fmt.setBackground(QColor(bg))
+                        if bold:
+                            fmt.setFontWeight(QFont.Bold)
 
-                    selection.cursor = cursor
-                    selection.format = fmt
-                    selections.append(selection)
+                        selection.cursor = cursor
+                        selection.format = fmt
+                        selections.append(selection)
 
-            if block == end_block:
-                break
-            block = block.next()
+                block = block.next()
+        else:
+            # 大文件：可见区域 + 上下各 100 行缓冲
+            cursor_top = viewer.cursorForPosition(viewer.viewport().rect().topLeft())
+            cursor_bottom = viewer.cursorForPosition(viewer.viewport().rect().bottomRight())
+
+            start_num = max(0, cursor_top.block().blockNumber() - 100)
+            end_num = min(total_blocks - 1, cursor_bottom.block().blockNumber() + 100)
+
+            block = doc.findBlockByNumber(start_num)
+            for _ in range(end_num - start_num + 1):
+                if not block.isValid():
+                    break
+                text = block.text()
+                block_pos = block.position()
+
+                for pattern, fg, bg, bold in kw_patterns:
+                    for match in pattern.finditer(text):
+                        selection = QTextEdit.ExtraSelection()
+                        cursor = QTextCursor(doc)
+                        cursor.setPosition(block_pos + match.start())
+                        cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
+
+                        fmt = QTextCharFormat()
+                        fmt.setForeground(QColor(fg))
+                        if bg:
+                            fmt.setBackground(QColor(bg))
+                        if bold:
+                            fmt.setFontWeight(QFont.Bold)
+
+                        selection.cursor = cursor
+                        selection.format = fmt
+                        selections.append(selection)
+
+                block = block.next()
 
         viewer.setExtraSelections(selections)
 
     def _on_scroll_update_highlights(self):
-        """滚动时更新可见区域的高亮"""
-        keywords = self.keyword_highlight_manager.get_enabled_keywords()
-        if keywords:
-            self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
+        """滚动时更新可见区域的高亮（仅大文件需要）"""
+        if len(self.lines) >= 5000:
+            keywords = self.keyword_highlight_manager.get_enabled_keywords()
+            if keywords:
+                self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
 
     def show_highlight_panel(self):
         """显示高亮管理面板"""
