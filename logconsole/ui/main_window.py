@@ -35,6 +35,7 @@ from .apple_hig_theme import (
 )
 from ..core.keyword_highlight import KeywordHighlightManager, PRESET_COLORS
 from .highlight_panel import HighlightManagePanel, ColorPickerDialog
+from .highlight_engine import HighlightEngine, HighlightRule, create_highlight_engine
 
 # 大文件阈值（字节），超过此大小使用虚拟滚动
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MB
@@ -454,13 +455,9 @@ class MainWindow(QMainWindow):
         self._selection_highlight_word = None  # 当前选中高亮的词
         self._is_selecting = False  # 是否正在拖动选择
 
-        # 监听滚动事件，更新关键词高亮
-        self.main_log_viewer.verticalScrollBar().valueChanged.connect(self._on_scroll_update_highlights)
-
-        # ExtraSelections 分层管理：关键词高亮 + 选中高亮 + 搜索高亮
-        self._keyword_selections = []  # 关键词高亮层
-        self._selection_selections = []  # 选中相同词高亮层
-        self._search_selections = []  # 搜索匹配高亮层
+        # 高性能高亮引擎（替代旧的分层 ExtraSelections）
+        self.highlight_engine = create_highlight_engine(self.main_log_viewer)
+        self.main_log_viewer.verticalScrollBar().valueChanged.connect(self.highlight_engine.on_scroll)
 
         main_viewer_layout.addWidget(self.main_log_viewer)
 
@@ -1199,7 +1196,7 @@ class MainWindow(QMainWindow):
         self.keyword_highlight_manager.remove_keyword(keyword)
 
     def _on_keyword_highlight_changed(self):
-        """关键词高亮变化回调 - 使用 ExtraSelections 实现，不调用 rehighlight"""
+        """关键词高亮变化回调 - 使用 HighlightEngine 实现"""
         keywords = self.keyword_highlight_manager.get_enabled_keywords()
 
         # 更新高亮器规则（用于新加载的文件）
@@ -1212,20 +1209,35 @@ class MainWindow(QMainWindow):
             if hl:
                 hl.set_user_keywords(keywords, mark_dirty=False)
 
-        # 直接应用高亮（不延迟）
-        self._apply_all_keyword_highlights()
+        # 使用 HighlightEngine 应用高亮
+        self._apply_keyword_highlights_via_engine()
 
-    def _apply_all_keyword_highlights(self):
-        """应用所有关键词高亮"""
+    def _apply_keyword_highlights_via_engine(self):
+        """通过 HighlightEngine 应用关键词高亮"""
         keywords = self.keyword_highlight_manager.get_enabled_keywords()
 
-        # 主视图 - 使用分层合并
-        self._build_keyword_selections(self.main_log_viewer, keywords)
-        self._merge_and_apply_selections(self.main_log_viewer)
-        # 强制立即重绘
-        self.main_log_viewer.viewport().repaint()
+        # 转换为 HighlightRule 格式
+        import re
+        rules = []
+        for kw in keywords:
+            if not kw.enabled:
+                continue
+            try:
+                pattern = re.compile(re.escape(kw.keyword), re.IGNORECASE)
+                rules.append(HighlightRule(
+                    pattern=pattern,
+                    fg_color=kw.fg_color,
+                    bg_color=kw.bg_color or "",
+                    bold=kw.bold,
+                    priority=0
+                ))
+            except re.error:
+                pass
 
-        # 所有 Grep 标签页
+        # 应用到主视图引擎
+        self.highlight_engine.set_keyword_rules(rules)
+
+        # 所有 Grep 标签页（使用原有方式，保持兼容）
         for tab_info in self.grep_tabs.values():
             viewer = tab_info.get("viewer")
             if viewer:
@@ -1314,34 +1326,10 @@ class MainWindow(QMainWindow):
 
         viewer._keyword_selections = selections
 
-    def _merge_and_apply_selections(self, viewer=None):
-        """合并所有层的 ExtraSelections 并应用到 viewer"""
-        if viewer is None:
-            viewer = self.main_log_viewer
-
-        # 合并：关键词高亮 + 选中高亮 + 搜索高亮
-        # 优先级：搜索 > 选中 > 关键词（后面的会覆盖前面的）
-        merged = []
-        merged.extend(getattr(viewer, '_keyword_selections', []))
-        merged.extend(self._selection_selections)
-        merged.extend(self._search_selections)
-
-        viewer.setExtraSelections(merged)
-
     def _apply_keyword_extra_selections(self, viewer, keywords):
-        """使用 ExtraSelections 应用关键词高亮 - 全文档搜索"""
+        """使用 ExtraSelections 应用关键词高亮（仅用于 Grep 标签页）"""
         self._build_keyword_selections(viewer, keywords)
-        if viewer == self.main_log_viewer:
-            self._merge_and_apply_selections(viewer)
-        else:
-            viewer.setExtraSelections(getattr(viewer, '_keyword_selections', []))
-
-    def _on_scroll_update_highlights(self):
-        """滚动时更新可见区域的高亮（仅大文件需要）"""
-        if len(self.lines) >= 5000:
-            keywords = self.keyword_highlight_manager.get_enabled_keywords()
-            if keywords:
-                self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
+        viewer.setExtraSelections(getattr(viewer, '_keyword_selections', []))
 
     def show_highlight_panel(self):
         """显示高亮管理面板"""
@@ -2214,40 +2202,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Export Error", str(e))
 
     def _apply_search_highlight(self, viewer, block, match_start: int, match_end: int):
-        """使用 ExtraSelections 高亮当前匹配行和搜索词（高性能，不阻塞 UI）"""
-        selections = []
-
-        # 1. 当前行背景高亮（深色半透明，更明显）
-        line_selection = QTextEdit.ExtraSelection()
-        line_fmt = QTextCharFormat()
-        line_fmt.setBackground(QColor(255, 200, 50, 40))
-        line_fmt.setProperty(QTextCharFormat.FullWidthSelection, True)
-        line_selection.format = line_fmt
-        line_cursor = QTextCursor(block)
-        line_cursor.clearSelection()
-        line_selection.cursor = line_cursor
-        selections.append(line_selection)
-
-        # 2. 当前匹配词高亮
-        if match_end > match_start:
-            word_selection = QTextEdit.ExtraSelection()
-            word_fmt = QTextCharFormat()
-            word_fmt.setBackground(QColor("#FF9500"))
-            word_fmt.setForeground(QColor("#000000"))
-            word_fmt.setFontWeight(QFont.Bold)
-            word_fmt.setUnderlineStyle(QTextCharFormat.SingleUnderline)
-            word_fmt.setUnderlineColor(QColor("#FF5500"))
-            word_selection.format = word_fmt
-
-            word_cursor = QTextCursor(block)
-            word_cursor.setPosition(block.position() + match_start)
-            word_cursor.setPosition(block.position() + match_end, QTextCursor.KeepAnchor)
-            word_selection.cursor = word_cursor
-            selections.append(word_selection)
-
-        # 存储到搜索高亮层，然后合并应用
-        self._search_selections = selections
-        self._merge_and_apply_selections(viewer)
+        """使用 HighlightEngine 高亮当前匹配行和搜索词"""
+        # 使用引擎的搜索高亮功能
+        self.highlight_engine.set_search_highlight(block, match_start, match_end)
 
     def _on_selection_changed(self):
         """选中文本变化时，高亮所有相同词语"""
@@ -2263,66 +2220,21 @@ class MainWindow(QMainWindow):
 
         # 如果没有选中文本或选中太短/太长，清除选中高亮层
         if not selected_text or len(selected_text) < 2 or len(selected_text) > 100:
-            self._selection_selections = []
-            self._merge_and_apply_selections()
+            self.highlight_engine.clear_selection_highlight()
             return
 
         # 如果选中包含换行，不处理
         if '\u2029' in selected_text:
-            self._selection_selections = []
-            self._merge_and_apply_selections()
+            self.highlight_engine.clear_selection_highlight()
             return
 
-        # 构建选中高亮 selections
-        self._build_selection_highlights(viewer, selected_text)
-        self._merge_and_apply_selections()
-
-    def _build_selection_highlights(self, viewer: QTextEdit, word: str):
-        """构建选中相同词的高亮 selections"""
-        import re
-
-        doc = viewer.document()
-        text = doc.toPlainText()
-
-        current_cursor = viewer.textCursor()
-        sel_start = current_cursor.selectionStart()
-        sel_end = current_cursor.selectionEnd()
-
-        selections = []
-        try:
-            pattern = re.compile(re.escape(word), re.IGNORECASE)
-            for match in pattern.finditer(text):
-                selection = QTextEdit.ExtraSelection()
-                fmt = QTextCharFormat()
-
-                if match.start() == sel_start and match.end() == sel_end:
-                    fmt.setBackground(QColor("#FF9500"))
-                    fmt.setForeground(QColor("#FFFFFF"))
-                    fmt.setFontWeight(QFont.Bold)
-                    fmt.setUnderlineStyle(QTextCharFormat.SingleUnderline)
-                    fmt.setUnderlineColor(QColor("#FF5500"))
-                else:
-                    fmt.setBackground(QColor("#FFEB3B"))
-                    fmt.setForeground(QColor("#1A1A1A"))
-
-                selection.format = fmt
-                cursor = QTextCursor(doc)
-                cursor.setPosition(match.start())
-                cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-                selection.cursor = cursor
-                selections.append(selection)
-
-                if len(selections) >= 500:
-                    break
-        except re.error:
-            pass
-
-        self._selection_selections = selections
+        # 使用 HighlightEngine 设置选中高亮
+        current_pos = (cursor.selectionStart(), cursor.selectionEnd())
+        self.highlight_engine.set_selection_highlight(selected_text, current_pos)
 
     def _highlight_all_occurrences(self, viewer: QTextEdit, word: str):
         """高亮所有相同词语出现的位置（兼容旧调用）"""
-        self._build_selection_highlights(viewer, word)
-        self._merge_and_apply_selections()
+        self.highlight_engine.set_selection_highlight(word)
 
     def eventFilter(self, obj, event):
         """事件过滤器：监听鼠标事件处理选中高亮"""
@@ -2334,8 +2246,7 @@ class MainWindow(QMainWindow):
                 # 鼠标按下，标记正在选择
                 self._is_selecting = True
                 # 清除选中高亮层，保留关键词高亮
-                self._selection_selections = []
-                self._merge_and_apply_selections()
+                self.highlight_engine.clear_selection_highlight()
                 self._selection_highlight_word = None
             elif event.type() == QEvent.MouseMove and self._is_selecting:
                 # 拖拽过程中，实时显示当前选中文本的橙色高亮
@@ -2354,18 +2265,9 @@ class MainWindow(QMainWindow):
         selected_text = cursor.selectedText().strip()
 
         if not selected_text or len(selected_text) < 2:
-            self._selection_selections = []
-            self._merge_and_apply_selections()
+            self.highlight_engine.clear_selection_highlight()
             return
 
-        selection = QTextEdit.ExtraSelection()
-        fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#FF9500"))
-        fmt.setForeground(QColor("#FFFFFF"))
-        fmt.setFontWeight(QFont.Bold)
-        fmt.setFontUnderline(True)
-        selection.format = fmt
-        selection.cursor = cursor
-
-        self._selection_selections = [selection]
-        self._merge_and_apply_selections()
+        # 使用引擎设置临时选中高亮
+        current_pos = (cursor.selectionStart(), cursor.selectionEnd())
+        self.highlight_engine.set_selection_highlight(selected_text, current_pos)
