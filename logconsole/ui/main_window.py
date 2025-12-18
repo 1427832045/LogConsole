@@ -442,6 +442,11 @@ class MainWindow(QMainWindow):
         # 监听滚动事件，更新关键词高亮
         self.main_log_viewer.verticalScrollBar().valueChanged.connect(self._on_scroll_update_highlights)
 
+        # ExtraSelections 分层管理：关键词高亮 + 选中高亮 + 搜索高亮
+        self._keyword_selections = []  # 关键词高亮层
+        self._selection_selections = []  # 选中相同词高亮层
+        self._search_selections = []  # 搜索匹配高亮层
+
         # 设置语法高亮（使用当前模板）
         current_template = self.template_manager.get_current_template()
         self.main_highlighter = ModernLogHighlighter(self.main_log_viewer.document(), current_template)
@@ -1096,8 +1101,9 @@ class MainWindow(QMainWindow):
             for color in PRESET_COLORS:
                 color_action = QAction(f"● {color['name']}", self)
                 color_action.setIcon(self._create_color_icon(color['fg']))
+                # 使用 QTimer.singleShot 延迟执行，确保菜单完全关闭后再应用高亮
                 color_action.triggered.connect(
-                    lambda checked, k=selected_text, c=color: self._add_keyword_highlight(k, c)
+                    lambda checked, k=selected_text, c=color: QTimer.singleShot(0, lambda: self._add_keyword_highlight(k, c))
                 )
                 highlight_menu.addAction(color_action)
 
@@ -1151,37 +1157,38 @@ class MainWindow(QMainWindow):
             if hl:
                 hl.set_user_keywords(keywords, mark_dirty=False)
 
-        # 使用 ExtraSelections 实现高亮
-        # 延迟 50ms 执行，确保菜单已完全关闭
-        QTimer.singleShot(50, self._apply_all_keyword_highlights)
+        # 直接应用高亮（不延迟）
+        self._apply_all_keyword_highlights()
 
     def _apply_all_keyword_highlights(self):
         """应用所有关键词高亮"""
         keywords = self.keyword_highlight_manager.get_enabled_keywords()
 
-        # 主视图
-        self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
-        # 强制重绘
-        self.main_log_viewer.viewport().update()
+        # 主视图 - 使用分层合并
+        self._build_keyword_selections(self.main_log_viewer, keywords)
+        self._merge_and_apply_selections(self.main_log_viewer)
+        # 强制立即重绘
+        self.main_log_viewer.viewport().repaint()
 
         # 所有 Grep 标签页
         for tab_info in self.grep_tabs.values():
             viewer = tab_info.get("viewer")
             if viewer:
-                self._apply_keyword_extra_selections(viewer, keywords)
-                viewer.viewport().update()
+                self._build_keyword_selections(viewer, keywords)
+                viewer.setExtraSelections(getattr(viewer, '_keyword_selections', []))
+                viewer.viewport().repaint()
 
-    def _apply_keyword_extra_selections(self, viewer, keywords):
-        """使用 ExtraSelections 应用关键词高亮 - 全文档搜索"""
+    def _build_keyword_selections(self, viewer, keywords):
+        """构建关键词高亮 selections 列表（不直接应用）"""
         if not viewer:
             return
 
+        selections = []
         if not keywords:
-            viewer.setExtraSelections([])
+            viewer._keyword_selections = selections
             return
 
         import re
-        selections = []
         doc = viewer.document()
         total_blocks = doc.blockCount()
 
@@ -1197,73 +1204,82 @@ class MainWindow(QMainWindow):
                 pass
 
         if not kw_patterns:
-            viewer.setExtraSelections([])
+            viewer._keyword_selections = selections
             return
 
-        # 小文件：全文档搜索
-        # 大文件：仅可见区域 + 缓冲区
+        # 小文件：全文档搜索；大文件：仅可见区域 + 缓冲区
         if total_blocks < 5000:
-            # 全文档搜索
             block = doc.begin()
             while block.isValid():
                 text = block.text()
                 block_pos = block.position()
-
                 for pattern, fg, bg, bold in kw_patterns:
                     for match in pattern.finditer(text):
                         selection = QTextEdit.ExtraSelection()
                         cursor = QTextCursor(doc)
                         cursor.setPosition(block_pos + match.start())
                         cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
-
                         fmt = QTextCharFormat()
                         fmt.setForeground(QColor(fg))
                         if bg:
                             fmt.setBackground(QColor(bg))
                         if bold:
                             fmt.setFontWeight(QFont.Bold)
-
                         selection.cursor = cursor
                         selection.format = fmt
                         selections.append(selection)
-
                 block = block.next()
         else:
-            # 大文件：可见区域 + 上下各 100 行缓冲
             cursor_top = viewer.cursorForPosition(viewer.viewport().rect().topLeft())
             cursor_bottom = viewer.cursorForPosition(viewer.viewport().rect().bottomRight())
-
             start_num = max(0, cursor_top.block().blockNumber() - 100)
             end_num = min(total_blocks - 1, cursor_bottom.block().blockNumber() + 100)
-
             block = doc.findBlockByNumber(start_num)
             for _ in range(end_num - start_num + 1):
                 if not block.isValid():
                     break
                 text = block.text()
                 block_pos = block.position()
-
                 for pattern, fg, bg, bold in kw_patterns:
                     for match in pattern.finditer(text):
                         selection = QTextEdit.ExtraSelection()
                         cursor = QTextCursor(doc)
                         cursor.setPosition(block_pos + match.start())
                         cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
-
                         fmt = QTextCharFormat()
                         fmt.setForeground(QColor(fg))
                         if bg:
                             fmt.setBackground(QColor(bg))
                         if bold:
                             fmt.setFontWeight(QFont.Bold)
-
                         selection.cursor = cursor
                         selection.format = fmt
                         selections.append(selection)
-
                 block = block.next()
 
-        viewer.setExtraSelections(selections)
+        viewer._keyword_selections = selections
+
+    def _merge_and_apply_selections(self, viewer=None):
+        """合并所有层的 ExtraSelections 并应用到 viewer"""
+        if viewer is None:
+            viewer = self.main_log_viewer
+
+        # 合并：关键词高亮 + 选中高亮 + 搜索高亮
+        # 优先级：搜索 > 选中 > 关键词（后面的会覆盖前面的）
+        merged = []
+        merged.extend(getattr(viewer, '_keyword_selections', []))
+        merged.extend(self._selection_selections)
+        merged.extend(self._search_selections)
+
+        viewer.setExtraSelections(merged)
+
+    def _apply_keyword_extra_selections(self, viewer, keywords):
+        """使用 ExtraSelections 应用关键词高亮 - 全文档搜索"""
+        self._build_keyword_selections(viewer, keywords)
+        if viewer == self.main_log_viewer:
+            self._merge_and_apply_selections(viewer)
+        else:
+            viewer.setExtraSelections(getattr(viewer, '_keyword_selections', []))
 
     def _on_scroll_update_highlights(self):
         """滚动时更新可见区域的高亮（仅大文件需要）"""
@@ -2124,7 +2140,7 @@ class MainWindow(QMainWindow):
         # 1. 当前行背景高亮（深色半透明，更明显）
         line_selection = QTextEdit.ExtraSelection()
         line_fmt = QTextCharFormat()
-        line_fmt.setBackground(QColor(255, 200, 50, 40))  # 暖黄色半透明
+        line_fmt.setBackground(QColor(255, 200, 50, 40))
         line_fmt.setProperty(QTextCharFormat.FullWidthSelection, True)
         line_selection.format = line_fmt
         line_cursor = QTextCursor(block)
@@ -2132,14 +2148,13 @@ class MainWindow(QMainWindow):
         line_selection.cursor = line_cursor
         selections.append(line_selection)
 
-        # 2. 当前匹配词高亮（亮橙色背景 + 黑色加粗 + 边框）
+        # 2. 当前匹配词高亮
         if match_end > match_start:
             word_selection = QTextEdit.ExtraSelection()
             word_fmt = QTextCharFormat()
-            word_fmt.setBackground(QColor("#FF9500"))  # 亮橙色
-            word_fmt.setForeground(QColor("#000000"))  # 黑色文字
+            word_fmt.setBackground(QColor("#FF9500"))
+            word_fmt.setForeground(QColor("#000000"))
             word_fmt.setFontWeight(QFont.Bold)
-            # 添加下划线使匹配更醒目
             word_fmt.setUnderlineStyle(QTextCharFormat.SingleUnderline)
             word_fmt.setUnderlineColor(QColor("#FF5500"))
             word_selection.format = word_fmt
@@ -2150,7 +2165,9 @@ class MainWindow(QMainWindow):
             word_selection.cursor = word_cursor
             selections.append(word_selection)
 
-        viewer.setExtraSelections(selections)
+        # 存储到搜索高亮层，然后合并应用
+        self._search_selections = selections
+        self._merge_and_apply_selections(viewer)
 
     def _on_selection_changed(self):
         """选中文本变化时，高亮所有相同词语"""
@@ -2164,32 +2181,33 @@ class MainWindow(QMainWindow):
 
         self._selection_highlight_word = selected_text
 
-        # 如果没有选中文本或选中太短/太长，清除高亮
+        # 如果没有选中文本或选中太短/太长，清除选中高亮层
         if not selected_text or len(selected_text) < 2 or len(selected_text) > 100:
-            viewer.setExtraSelections([])
+            self._selection_selections = []
+            self._merge_and_apply_selections()
             return
 
         # 如果选中包含换行，不处理
-        if '\u2029' in selected_text:  # Qt 用 \u2029 表示换行
-            viewer.setExtraSelections([])
+        if '\u2029' in selected_text:
+            self._selection_selections = []
+            self._merge_and_apply_selections()
             return
 
-        # 使用 ExtraSelections 高亮所有相同词
-        self._highlight_all_occurrences(viewer, selected_text)
+        # 构建选中高亮 selections
+        self._build_selection_highlights(viewer, selected_text)
+        self._merge_and_apply_selections()
 
-    def _highlight_all_occurrences(self, viewer: QTextEdit, word: str):
-        """高亮所有相同词语出现的位置（当前选中用橙色，其他用黄色）"""
+    def _build_selection_highlights(self, viewer: QTextEdit, word: str):
+        """构建选中相同词的高亮 selections"""
         import re
 
         doc = viewer.document()
         text = doc.toPlainText()
 
-        # 获取当前选中的位置范围
         current_cursor = viewer.textCursor()
         sel_start = current_cursor.selectionStart()
         sel_end = current_cursor.selectionEnd()
 
-        # 搜索所有匹配位置（大小写不敏感）
         selections = []
         try:
             pattern = re.compile(re.escape(word), re.IGNORECASE)
@@ -2197,33 +2215,34 @@ class MainWindow(QMainWindow):
                 selection = QTextEdit.ExtraSelection()
                 fmt = QTextCharFormat()
 
-                # 当前选中的词：橙色背景 + 白色文字 + 下划线（更醒目）
                 if match.start() == sel_start and match.end() == sel_end:
-                    fmt.setBackground(QColor("#FF9500"))  # 橙色背景
-                    fmt.setForeground(QColor("#FFFFFF"))  # 白色文字
+                    fmt.setBackground(QColor("#FF9500"))
+                    fmt.setForeground(QColor("#FFFFFF"))
                     fmt.setFontWeight(QFont.Bold)
                     fmt.setUnderlineStyle(QTextCharFormat.SingleUnderline)
                     fmt.setUnderlineColor(QColor("#FF5500"))
                 else:
-                    # 其他相同词语：亮黄色背景 + 深灰色文字
                     fmt.setBackground(QColor("#FFEB3B"))
                     fmt.setForeground(QColor("#1A1A1A"))
 
                 selection.format = fmt
-
                 cursor = QTextCursor(doc)
                 cursor.setPosition(match.start())
                 cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
                 selection.cursor = cursor
                 selections.append(selection)
 
-                # 限制高亮数量，避免性能问题
                 if len(selections) >= 500:
                     break
         except re.error:
             pass
 
-        viewer.setExtraSelections(selections)
+        self._selection_selections = selections
+
+    def _highlight_all_occurrences(self, viewer: QTextEdit, word: str):
+        """高亮所有相同词语出现的位置（兼容旧调用）"""
+        self._build_selection_highlights(viewer, word)
+        self._merge_and_apply_selections()
 
     def eventFilter(self, obj, event):
         """事件过滤器：监听鼠标事件处理选中高亮"""
@@ -2234,8 +2253,9 @@ class MainWindow(QMainWindow):
             if event.type() == QEvent.MouseButtonPress:
                 # 鼠标按下，标记正在选择
                 self._is_selecting = True
-                # 清除旧的高亮
-                self.main_log_viewer.setExtraSelections([])
+                # 清除选中高亮层，保留关键词高亮
+                self._selection_selections = []
+                self._merge_and_apply_selections()
                 self._selection_highlight_word = None
             elif event.type() == QEvent.MouseMove and self._is_selecting:
                 # 拖拽过程中，实时显示当前选中文本的橙色高亮
@@ -2254,20 +2274,18 @@ class MainWindow(QMainWindow):
         selected_text = cursor.selectedText().strip()
 
         if not selected_text or len(selected_text) < 2:
-            self.main_log_viewer.setExtraSelections([])
+            self._selection_selections = []
+            self._merge_and_apply_selections()
             return
-
-        # 创建当前选中的高亮样式（橙色背景 + 白色加粗下划线）
-        from PyQt5.QtWidgets import QTextEdit
-        from PyQt5.QtGui import QTextCharFormat, QColor, QFont
 
         selection = QTextEdit.ExtraSelection()
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#FF9500"))  # 橙色背景
-        fmt.setForeground(QColor("#FFFFFF"))  # 白色文字
+        fmt.setBackground(QColor("#FF9500"))
+        fmt.setForeground(QColor("#FFFFFF"))
         fmt.setFontWeight(QFont.Bold)
         fmt.setFontUnderline(True)
         selection.format = fmt
         selection.cursor = cursor
 
-        self.main_log_viewer.setExtraSelections([selection])
+        self._selection_selections = [selection]
+        self._merge_and_apply_selections()
