@@ -396,6 +396,9 @@ class MainWindow(QMainWindow):
         self.main_log_viewer.setTabStopDistance(40)
         self.main_log_viewer.setContextMenuPolicy(Qt.CustomContextMenu)
         self.main_log_viewer.customContextMenuRequested.connect(self.show_context_menu)
+        self.main_log_viewer.viewport().installEventFilter(self)  # 监听鼠标释放
+        self._selection_highlight_word = None  # 当前选中高亮的词
+        self._is_selecting = False  # 是否正在拖动选择
 
         # 设置语法高亮（使用当前模板）
         current_template = self.template_manager.get_current_template()
@@ -1460,6 +1463,8 @@ class MainWindow(QMainWindow):
 
             # 行号前缀长度: "{i:6d} │ " = 9 字符
             LINE_PREFIX_LEN = 9
+            actual_start = 0
+            actual_end = 0
 
             if start_col >= 0:
                 actual_start = LINE_PREFIX_LEN + start_col
@@ -1488,8 +1493,8 @@ class MainWindow(QMainWindow):
             target_scroll = max(0, cursor_rect.x() - viewport_width // 4)
             h_scroll.setValue(target_scroll)
 
-            # 使用 ExtraSelections 高亮（高性能）
-            self._apply_search_highlight(viewer, block, actual_start if start_col >= 0 else 0, actual_end if end_col >= 0 else 0)
+            # 使用 ExtraSelections 高亮当前匹配（高性能）
+            self._apply_search_highlight(viewer, block, actual_start, actual_end)
 
         # 更新状态栏
         col_display = start_col + 1 if start_col >= 0 else 1
@@ -1873,10 +1878,10 @@ class MainWindow(QMainWindow):
         """使用 ExtraSelections 高亮当前匹配行和搜索词（高性能，不阻塞 UI）"""
         selections = []
 
-        # 1. 当前行背景高亮（浅黄色半透明）
+        # 1. 当前行背景高亮（深色半透明，更明显）
         line_selection = QTextEdit.ExtraSelection()
         line_fmt = QTextCharFormat()
-        line_fmt.setBackground(QColor(255, 230, 109, 60))  # 浅黄色半透明
+        line_fmt.setBackground(QColor(255, 200, 50, 40))  # 暖黄色半透明
         line_fmt.setProperty(QTextCharFormat.FullWidthSelection, True)
         line_selection.format = line_fmt
         line_cursor = QTextCursor(block)
@@ -1884,13 +1889,16 @@ class MainWindow(QMainWindow):
         line_selection.cursor = line_cursor
         selections.append(line_selection)
 
-        # 2. 搜索词高亮（黄色背景 + 黑色加粗）
+        # 2. 当前匹配词高亮（亮橙色背景 + 黑色加粗 + 边框）
         if match_end > match_start:
             word_selection = QTextEdit.ExtraSelection()
             word_fmt = QTextCharFormat()
-            word_fmt.setBackground(QColor("#FFE66D"))
-            word_fmt.setForeground(QColor("#000000"))
+            word_fmt.setBackground(QColor("#FF9500"))  # 亮橙色
+            word_fmt.setForeground(QColor("#000000"))  # 黑色文字
             word_fmt.setFontWeight(QFont.Bold)
+            # 添加下划线使匹配更醒目
+            word_fmt.setUnderlineStyle(QTextCharFormat.SingleUnderline)
+            word_fmt.setUnderlineColor(QColor("#FF5500"))
             word_selection.format = word_fmt
 
             word_cursor = QTextCursor(block)
@@ -1900,3 +1908,123 @@ class MainWindow(QMainWindow):
             selections.append(word_selection)
 
         viewer.setExtraSelections(selections)
+
+    def _on_selection_changed(self):
+        """选中文本变化时，高亮所有相同词语"""
+        viewer = self.main_log_viewer
+        cursor = viewer.textCursor()
+        selected_text = cursor.selectedText().strip()
+
+        # 如果选中的词和上次相同，不重复处理
+        if selected_text == self._selection_highlight_word:
+            return
+
+        self._selection_highlight_word = selected_text
+
+        # 如果没有选中文本或选中太短/太长，清除高亮
+        if not selected_text or len(selected_text) < 2 or len(selected_text) > 100:
+            viewer.setExtraSelections([])
+            return
+
+        # 如果选中包含换行，不处理
+        if '\u2029' in selected_text:  # Qt 用 \u2029 表示换行
+            viewer.setExtraSelections([])
+            return
+
+        # 使用 ExtraSelections 高亮所有相同词
+        self._highlight_all_occurrences(viewer, selected_text)
+
+    def _highlight_all_occurrences(self, viewer: QTextEdit, word: str):
+        """高亮所有相同词语出现的位置（当前选中用橙色，其他用黄色）"""
+        import re
+
+        doc = viewer.document()
+        text = doc.toPlainText()
+
+        # 获取当前选中的位置范围
+        current_cursor = viewer.textCursor()
+        sel_start = current_cursor.selectionStart()
+        sel_end = current_cursor.selectionEnd()
+
+        # 搜索所有匹配位置（大小写不敏感）
+        selections = []
+        try:
+            pattern = re.compile(re.escape(word), re.IGNORECASE)
+            for match in pattern.finditer(text):
+                selection = QTextEdit.ExtraSelection()
+                fmt = QTextCharFormat()
+
+                # 当前选中的词：橙色背景 + 白色文字 + 下划线（更醒目）
+                if match.start() == sel_start and match.end() == sel_end:
+                    fmt.setBackground(QColor("#FF9500"))  # 橙色背景
+                    fmt.setForeground(QColor("#FFFFFF"))  # 白色文字
+                    fmt.setFontWeight(QFont.Bold)
+                    fmt.setUnderlineStyle(QTextCharFormat.SingleUnderline)
+                    fmt.setUnderlineColor(QColor("#FF5500"))
+                else:
+                    # 其他相同词语：亮黄色背景 + 深灰色文字
+                    fmt.setBackground(QColor("#FFEB3B"))
+                    fmt.setForeground(QColor("#1A1A1A"))
+
+                selection.format = fmt
+
+                cursor = QTextCursor(doc)
+                cursor.setPosition(match.start())
+                cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
+                selection.cursor = cursor
+                selections.append(selection)
+
+                # 限制高亮数量，避免性能问题
+                if len(selections) >= 500:
+                    break
+        except re.error:
+            pass
+
+        viewer.setExtraSelections(selections)
+
+    def eventFilter(self, obj, event):
+        """事件过滤器：监听鼠标事件处理选中高亮"""
+        from PyQt5.QtCore import QEvent
+
+        # 只处理主日志查看器的 viewport
+        if obj == self.main_log_viewer.viewport():
+            if event.type() == QEvent.MouseButtonPress:
+                # 鼠标按下，标记正在选择
+                self._is_selecting = True
+                # 清除旧的高亮
+                self.main_log_viewer.setExtraSelections([])
+                self._selection_highlight_word = None
+            elif event.type() == QEvent.MouseMove and self._is_selecting:
+                # 拖拽过程中，实时显示当前选中文本的橙色高亮
+                self._highlight_current_selection_only()
+            elif event.type() == QEvent.MouseButtonRelease:
+                # 鼠标释放，处理完整高亮（当前选中 + 其他匹配项）
+                if self._is_selecting:
+                    self._is_selecting = False
+                    self._on_selection_changed()
+
+        return super().eventFilter(obj, event)
+
+    def _highlight_current_selection_only(self):
+        """仅高亮当前选中的文本（拖拽过程中使用）"""
+        cursor = self.main_log_viewer.textCursor()
+        selected_text = cursor.selectedText().strip()
+
+        if not selected_text or len(selected_text) < 2:
+            self.main_log_viewer.setExtraSelections([])
+            return
+
+        # 创建当前选中的高亮样式（橙色背景 + 白色加粗下划线）
+        from PyQt5.QtWidgets import QTextEdit
+        from PyQt5.QtGui import QTextCharFormat, QColor, QFont
+
+        selection = QTextEdit.ExtraSelection()
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor("#FF9500"))  # 橙色背景
+        fmt.setForeground(QColor("#FFFFFF"))  # 白色文字
+        fmt.setFontWeight(QFont.Bold)
+        fmt.setFontUnderline(True)
+        selection.format = fmt
+        selection.cursor = cursor
+
+        self.main_log_viewer.setExtraSelections([selection])
