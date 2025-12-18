@@ -42,30 +42,37 @@ class HighlightDelegate(QStyledItemDelegate):
     """支持 HTML 富文本渲染的 QTreeWidget 代理，用于部分高亮匹配词"""
 
     def paint(self, painter, option, index):
-        self.initStyleOption(option, index)
+        # 获取 style
         style = option.widget.style() if option.widget else QApplication.style()
 
-        # 使用 QTextDocument 渲染 HTML
-        doc = QTextDocument()
-        doc.setDefaultFont(option.font)
-        # 设置默认文字颜色（浅灰色，适配深色背景）
-        doc.setDefaultStyleSheet(f"body {{ color: {APPLE_COLORS['text_primary']}; }}")
-        doc.setHtml(f"<body>{option.text}</body>")
+        # 初始化选项
+        self.initStyleOption(option, index)
 
-        # 绘制背景（选中/悬停状态）
+        # 保存原始文本
+        original_text = option.text
+
+        # 先让 Qt 绘制背景和 branch（折叠箭头）
         option.text = ""
         style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
 
-        # 绘制文本 - 垂直居中
-        painter.save()
-        text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, option, option.widget)
-        # 计算垂直居中偏移
-        doc_height = doc.size().height()
-        y_offset = max(0, (text_rect.height() - doc_height) / 2)
-        painter.translate(text_rect.left(), text_rect.top() + y_offset)
-        painter.setClipRect(text_rect.translated(-text_rect.left(), -text_rect.top() - y_offset))
-        doc.drawContents(painter)
-        painter.restore()
+        # 然后手动绘制 HTML 富文本
+        if original_text:
+            doc = QTextDocument()
+            doc.setDefaultFont(option.font)
+            doc.setDefaultStyleSheet(f"body {{ color: {APPLE_COLORS['text_primary']}; }}")
+            doc.setHtml(f"<body>{original_text}</body>")
+
+            # 计算文本绘制区域
+            text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, option, option.widget)
+
+            # 绘制文本 - 垂直居中
+            painter.save()
+            doc_height = doc.size().height()
+            y_offset = max(0, (text_rect.height() - doc_height) / 2)
+            painter.translate(text_rect.left(), text_rect.top() + y_offset)
+            painter.setClipRect(text_rect.translated(-text_rect.left(), -text_rect.top() - y_offset))
+            doc.drawContents(painter)
+            painter.restore()
 
     def sizeHint(self, option, index):
         # 使用默认 sizeHint，保持行高一致
