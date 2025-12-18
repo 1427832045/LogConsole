@@ -1185,7 +1185,7 @@ class MainWindow(QMainWindow):
         self.keyword_highlight_manager.remove_keyword(keyword)
 
     def _on_keyword_highlight_changed(self):
-        """关键词高亮变化回调 - 使用增量刷新避免 UI 卡死"""
+        """关键词高亮变化回调 - 异步分块刷新避免 UI 卡死"""
         keywords = self.keyword_highlight_manager.get_enabled_keywords()
 
         # 更新主高亮器规则
@@ -1197,56 +1197,60 @@ class MainWindow(QMainWindow):
             if tab_info.get("highlighter"):
                 tab_info["highlighter"].set_user_keywords(keywords)
 
-        # 延迟刷新，避免阻塞 UI
-        QTimer.singleShot(10, self._deferred_rehighlight)
+        # 异步分块刷新整个文档
+        QTimer.singleShot(10, self._async_rehighlight_all)
 
-    def _deferred_rehighlight(self):
-        """延迟执行 rehighlight - 仅刷新可见区域"""
+    def _async_rehighlight_all(self):
+        """异步分块刷新所有高亮 - 避免大文件卡死"""
         if not self.highlighter:
             return
 
-        # 对于任何大小的文件，都使用可见区域刷新策略
-        self._rehighlight_visible_area(self.main_log_viewer, self.highlighter)
+        doc = self.main_log_viewer.document()
+        total_blocks = doc.blockCount()
 
-        # 刷新 Grep 标签页（仅当前可见的）
-        current_tab = self.tab_widget.currentIndex()
-        if current_tab in self.grep_tabs:
-            tab_info = self.grep_tabs[current_tab]
-            if tab_info.get("highlighter") and tab_info.get("viewer"):
-                self._rehighlight_visible_area(tab_info["viewer"], tab_info["highlighter"])
-
-    def _rehighlight_visible_area(self, viewer, highlighter):
-        """仅重新高亮可见区域"""
-        if not viewer or not highlighter:
+        # 小文件（<3000行）直接全量刷新
+        if total_blocks < 3000:
+            self.highlighter.rehighlight()
+            for tab_info in self.grep_tabs.values():
+                if tab_info.get("highlighter"):
+                    tab_info["highlighter"].rehighlight()
             return
 
-        # 获取可见区域的第一个和最后一个 block
-        first_visible = viewer.firstVisibleBlock() if hasattr(viewer, 'firstVisibleBlock') else None
+        # 大文件：分块刷新，每次处理 500 个 block
+        self._rehighlight_chunk_start = 0
+        self._rehighlight_chunk_size = 500
+        self._rehighlight_in_progress = True
+        self._process_rehighlight_chunk()
 
-        if first_visible:
-            # QPlainTextEdit: 使用 firstVisibleBlock
-            block = first_visible
-            viewport_height = viewer.viewport().height()
-            y = 0
-            while block.isValid() and y < viewport_height:
-                highlighter.rehighlightBlock(block)
-                y += viewer.blockBoundingRect(block).height()
+    def _process_rehighlight_chunk(self):
+        """处理一个分块的 rehighlight"""
+        if not self._rehighlight_in_progress or not self.highlighter:
+            return
+
+        doc = self.main_log_viewer.document()
+        total_blocks = doc.blockCount()
+        start = self._rehighlight_chunk_start
+        end = min(start + self._rehighlight_chunk_size, total_blocks)
+
+        # 处理当前分块
+        block = doc.findBlockByNumber(start)
+        for _ in range(end - start):
+            if block.isValid():
+                self.highlighter.rehighlightBlock(block)
                 block = block.next()
+
+        # 更新进度
+        self._rehighlight_chunk_start = end
+
+        # 继续处理下一个分块，或完成
+        if end < total_blocks:
+            QTimer.singleShot(5, self._process_rehighlight_chunk)
         else:
-            # QTextEdit: 通过光标定位可见区域
-            doc = viewer.document()
-            cursor_top = viewer.cursorForPosition(viewer.viewport().rect().topLeft())
-            cursor_bottom = viewer.cursorForPosition(viewer.viewport().rect().bottomLeft())
-
-            start_block = cursor_top.block()
-            end_block = cursor_bottom.block()
-
-            block = start_block
-            while block.isValid():
-                highlighter.rehighlightBlock(block)
-                if block == end_block:
-                    break
-                block = block.next()
+            self._rehighlight_in_progress = False
+            # 刷新 Grep 标签页
+            for tab_info in self.grep_tabs.values():
+                if tab_info.get("highlighter"):
+                    tab_info["highlighter"].rehighlight()
 
     def show_highlight_panel(self):
         """显示高亮管理面板"""
