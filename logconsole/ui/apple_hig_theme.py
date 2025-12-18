@@ -659,6 +659,24 @@ def get_add_grep_dialog_style():
     """
 
 
+def get_minimap_style():
+    """Minimap - VSCode 风格缩略图"""
+    return f"""
+        MiniMap {{
+            background: #141416;
+            border: none;
+            border-left: 1px solid {APPLE_COLORS['border']};
+        }}
+        MiniMap QPlainTextEdit {{
+            background: #141416;
+            color: {APPLE_COLORS['text_tertiary']};
+            border: none;
+            padding: 0;
+            margin: 0;
+        }}
+    """
+
+
 # 导出兼容
 SYSTEM_BLUE = APPLE_COLORS["accent"]
 SYSTEM_GREEN = APPLE_COLORS["success"]

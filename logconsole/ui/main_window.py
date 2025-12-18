@@ -25,6 +25,7 @@ from ..core.template_manager import TemplateManager
 from ..core.highlight_template import HighlightTemplate, HighlightRule
 from .virtual_log_viewer import VirtualLogViewer
 from .search_dialog import SearchDialog
+from .minimap import MiniMap
 from .apple_hig_theme import (
     APPLE_COLORS, APPLE_FONT_FAMILY, APPLE_MONO_FONT, ICONS,
     get_main_window_style, get_toolbar_style, get_tab_widget_style,
@@ -398,6 +399,12 @@ class MainWindow(QMainWindow):
         tab_bar.setExpanding(False)
         tab_bar.setDrawBase(False)
 
+        # 主日志查看器容器（编辑器 + Minimap）
+        self.main_viewer_container = QWidget()
+        main_viewer_layout = QHBoxLayout(self.main_viewer_container)
+        main_viewer_layout.setContentsMargins(0, 0, 0, 0)
+        main_viewer_layout.setSpacing(0)
+
         # 主日志查看器
         self.main_log_viewer = QTextEdit()
         self.main_log_viewer.setReadOnly(True)
@@ -410,12 +417,19 @@ class MainWindow(QMainWindow):
         self._selection_highlight_word = None  # 当前选中高亮的词
         self._is_selecting = False  # 是否正在拖动选择
 
+        main_viewer_layout.addWidget(self.main_log_viewer)
+
+        # 主 Minimap
+        self.main_minimap = MiniMap()
+        self.main_minimap.attach_editor(self.main_log_viewer)
+        main_viewer_layout.addWidget(self.main_minimap)
+
         # 设置语法高亮（使用当前模板）
         current_template = self.template_manager.get_current_template()
         self.main_highlighter = ModernLogHighlighter(self.main_log_viewer.document(), current_template)
 
         # 添加主标签页（标题初始为"Untitled"）
-        self.main_tab_index = self.tab_widget.addTab(self.main_log_viewer, "Untitled")
+        self.main_tab_index = self.tab_widget.addTab(self.main_viewer_container, "Untitled")
 
         # 保持向后兼容
         self.log_viewer = self.main_log_viewer
@@ -1126,13 +1140,27 @@ class MainWindow(QMainWindow):
         filter_layout.addStretch()
         container_layout.addWidget(filter_bar)
 
+        # 创建内容区（编辑器 + Minimap）
+        content_container = QWidget()
+        content_layout = QHBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
         # 创建 QPlainTextEdit - Apple HIG 风格
         grep_viewer = QPlainTextEdit()
         grep_viewer.setReadOnly(True)
         grep_viewer.setFont(QFont(APPLE_MONO_FONT.split(',')[0].strip("'"), 12))
         grep_viewer.setLineWrapMode(QPlainTextEdit.NoWrap)
         grep_viewer.setTabStopDistance(40)
-        # 主样式已在 get_main_window_style() 中定义
+
+        content_layout.addWidget(grep_viewer)
+
+        # 创建 Minimap
+        grep_minimap = MiniMap()
+        grep_minimap.attach_editor(grep_viewer)
+        content_layout.addWidget(grep_minimap)
+
+        container_layout.addWidget(content_container)
 
         # 大量结果时禁用高亮（>5000行）
         grep_highlighter = None
@@ -1142,8 +1170,6 @@ class MainWindow(QMainWindow):
 
         # 显示过滤后的内容
         grep_viewer.setPlainText("\n".join(filtered_lines))
-
-        container_layout.addWidget(grep_viewer)
 
         # 添加标签页
         tab_index = self.tab_widget.addTab(container, keyword)
@@ -1156,7 +1182,8 @@ class MainWindow(QMainWindow):
             "highlighter": grep_highlighter,
             "container": container,
             "filter_bar": filter_bar,
-            "count_label": count_label
+            "count_label": count_label,
+            "minimap": grep_minimap
         }
 
         # 显示提示
@@ -1372,20 +1399,32 @@ class MainWindow(QMainWindow):
             self.virtual_viewer = VirtualLogViewer()
             self.virtual_viewer.context_menu_requested.connect(self.show_context_menu)
 
+        # 创建虚拟查看器容器（包含 Minimap）
+        virtual_container = QWidget()
+        virtual_layout = QHBoxLayout(virtual_container)
+        virtual_layout.setContentsMargins(0, 0, 0, 0)
+        virtual_layout.setSpacing(0)
+        virtual_layout.addWidget(self.virtual_viewer)
+
+        # 大文件模式也支持 Minimap
+        self.virtual_minimap = MiniMap()
+        self.virtual_minimap.attach_editor(self.virtual_viewer.text_view)
+        virtual_layout.addWidget(self.virtual_minimap)
+
         # 替换主标签页内容
         current_widget = self.tab_widget.widget(self.main_tab_index)
-        if current_widget != self.virtual_viewer:
+        if current_widget != virtual_container:
             self.tab_widget.removeTab(self.main_tab_index)
-            self.main_tab_index = self.tab_widget.insertTab(0, self.virtual_viewer, "Untitled")
+            self.main_tab_index = self.tab_widget.insertTab(0, virtual_container, "Untitled")
             self.log_viewer = self.virtual_viewer
             self.highlighter = None  # 大文件模式无语法高亮
 
     def switch_to_normal_viewer(self):
         """切换到普通查看器（小文件模式）"""
         current_widget = self.tab_widget.widget(self.main_tab_index)
-        if current_widget != self.main_log_viewer:
+        if current_widget != self.main_viewer_container:
             self.tab_widget.removeTab(self.main_tab_index)
-            self.main_tab_index = self.tab_widget.insertTab(0, self.main_log_viewer, "Untitled")
+            self.main_tab_index = self.tab_widget.insertTab(0, self.main_viewer_container, "Untitled")
             self.log_viewer = self.main_log_viewer
             self.highlighter = self.main_highlighter
 
