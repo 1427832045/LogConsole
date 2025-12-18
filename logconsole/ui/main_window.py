@@ -1200,18 +1200,31 @@ class MainWindow(QMainWindow):
         if self.highlighter:
             self.highlighter.set_user_keywords(keywords, mark_dirty=False)
 
-        # 使用 ExtraSelections 实现高亮（不卡顿）
-        # 延迟一帧执行，确保菜单已关闭，viewport 已更新
-        QTimer.singleShot(0, lambda: self._apply_keyword_extra_selections(self.main_log_viewer, keywords))
-
-        # 更新所有 Grep 标签页
+        # 更新所有 Grep 标签页的高亮器规则
         for tab_info in self.grep_tabs.values():
             hl = tab_info.get("highlighter")
-            viewer = tab_info.get("viewer")
             if hl:
                 hl.set_user_keywords(keywords, mark_dirty=False)
+
+        # 使用 ExtraSelections 实现高亮
+        # 延迟 50ms 执行，确保菜单已完全关闭
+        QTimer.singleShot(50, self._apply_all_keyword_highlights)
+
+    def _apply_all_keyword_highlights(self):
+        """应用所有关键词高亮"""
+        keywords = self.keyword_highlight_manager.get_enabled_keywords()
+
+        # 主视图
+        self._apply_keyword_extra_selections(self.main_log_viewer, keywords)
+        # 强制重绘
+        self.main_log_viewer.viewport().update()
+
+        # 所有 Grep 标签页
+        for tab_info in self.grep_tabs.values():
+            viewer = tab_info.get("viewer")
             if viewer:
-                QTimer.singleShot(0, lambda v=viewer, k=keywords: self._apply_keyword_extra_selections(v, k))
+                self._apply_keyword_extra_selections(viewer, keywords)
+                viewer.viewport().update()
 
     def _apply_keyword_extra_selections(self, viewer, keywords):
         """使用 ExtraSelections 应用关键词高亮 - 全文档搜索"""
