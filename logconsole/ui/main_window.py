@@ -48,7 +48,9 @@ class HighlightDelegate(QStyledItemDelegate):
         # 使用 QTextDocument 渲染 HTML
         doc = QTextDocument()
         doc.setDefaultFont(option.font)
-        doc.setHtml(option.text)
+        # 设置默认文字颜色（浅灰色，适配深色背景）
+        doc.setDefaultStyleSheet(f"body {{ color: {APPLE_COLORS['text_primary']}; }}")
+        doc.setHtml(f"<body>{option.text}</body>")
 
         # 绘制背景（选中/悬停状态）
         option.text = ""
@@ -775,6 +777,7 @@ class MainWindow(QMainWindow):
             l1_text = f"▼ \"{query}\" · {total_matches}"
             l1_item = QTreeWidgetItem([l1_text])
             l1_item.setData(0, Qt.UserRole, {"type": "search", "search_id": search_id})
+            l1_item.setForeground(0, QColor(APPLE_COLORS['text_primary']))
             self.results_tree.addTopLevelItem(l1_item)
 
             for file_result in file_results:
@@ -791,6 +794,7 @@ class MainWindow(QMainWindow):
                     "search_id": search_id,
                     "tab_index": tab_index
                 })
+                l2_item.setForeground(0, QColor(APPLE_COLORS['text_primary']))
                 l1_item.addChild(l2_item)
 
                 # L3: 平铺显示所有匹配（不分组）
@@ -857,9 +861,10 @@ class MainWindow(QMainWindow):
                 prefix = html.escape(text[:start])
                 matched = html.escape(text[start:end])
                 suffix = html.escape(text[end:])
-                # 构建 HTML，仅高亮匹配部分
-                highlight_color = APPLE_COLORS['accent']
-                html_text = f'{prefix}<span style="color:{highlight_color};font-weight:bold;">{matched}</span>{suffix}'
+                # 构建 HTML，设置整体文字颜色，高亮匹配部分
+                text_color = APPLE_COLORS['text_primary']  # 浅色文字
+                highlight_color = APPLE_COLORS['accent']    # 橙色高亮
+                html_text = f'<span style="color:{text_color};">{prefix}<span style="color:{highlight_color};font-weight:bold;">{matched}</span>{suffix}</span>'
                 item.setText(0, html_text)
         except re.error:
             pass
