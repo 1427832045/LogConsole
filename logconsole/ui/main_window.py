@@ -56,14 +56,7 @@ class HighlightDelegate(QStyledItemDelegate):
         opt.text = ""
         style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
 
-        # 手动绘制 branch 装饰器（折叠箭头）
-        branch_rect = style.subElementRect(QStyle.SE_TreeViewDisclosureItem, opt, opt.widget)
-        if branch_rect.isValid():
-            branch_opt = QStyleOptionViewItem(opt)
-            branch_opt.rect = branch_rect
-            style.drawPrimitive(QStyle.PE_IndicatorBranch, branch_opt, painter, opt.widget)
-
-        # 然后手动绘制 HTML 富文本
+        # 绘制 HTML 富文本
         if original_text:
             doc = QTextDocument()
             doc.setDefaultFont(opt.font)
@@ -439,9 +432,10 @@ class MainWindow(QMainWindow):
         self.results_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.results_tree.customContextMenuRequested.connect(self.show_results_context_menu)
         self.results_tree.setItemDelegate(HighlightDelegate(self.results_tree))
-        # 确保显示折叠箭头
-        self.results_tree.setRootIsDecorated(True)
-        self.results_tree.setIndentation(20)
+        # 单击即可展开/折叠（配合文本箭头）
+        self.results_tree.itemClicked.connect(self._on_tree_item_clicked)
+        self.results_tree.setRootIsDecorated(False)  # 隐藏原生箭头，使用文本箭头
+        self.results_tree.setIndentation(16)  # 保留层级缩进
         self.results_tree.hide()
         splitter.addWidget(self.results_tree)
 
@@ -791,8 +785,9 @@ class MainWindow(QMainWindow):
             total_matches = search_result["total_matches"]
             search_id = search_result["search_id"]
 
-            # L1: 搜索词节点
-            l1_text = f"\"{query}\" · {total_matches}"
+            # L1: 搜索词节点 - 使用文本箭头
+            arrow = "▼" if True else "▶"  # 默认展开
+            l1_text = f"{arrow} \"{query}\" · {total_matches}"
             l1_item = QTreeWidgetItem([l1_text])
             l1_item.setData(0, Qt.UserRole, {"type": "search", "search_id": search_id})
             l1_item.setForeground(0, QColor(APPLE_COLORS['text_primary']))
@@ -804,8 +799,9 @@ class MainWindow(QMainWindow):
                 tab_index = file_result["tab_index"]
                 lines = file_result["lines"]
 
-                # L2: 文件节点
-                l2_text = f"{filename} · {len(matches)}"
+                # L2: 文件节点 - 使用文本箭头
+                arrow = "▼" if True else "▶"  # 默认展开
+                l2_text = f"{arrow} {filename} · {len(matches)}"
                 l2_item = QTreeWidgetItem([l2_text])
                 l2_item.setData(0, Qt.UserRole, {
                     "type": "file",
@@ -848,12 +844,21 @@ class MainWindow(QMainWindow):
             self._tree_signals_connected = True
 
     def _on_tree_item_expanded(self, item: QTreeWidgetItem):
-        """树节点展开时的处理"""
-        pass  # 固定高度，不自动调整
+        """树节点展开时更新文本箭头"""
+        text = item.text(0)
+        if text.startswith("▶"):
+            item.setText(0, "▼" + text[1:])
 
     def _on_tree_item_collapsed(self, item: QTreeWidgetItem):
-        """树节点折叠时的处理"""
-        pass  # 固定高度，不自动调整
+        """树节点折叠时更新文本箭头"""
+        text = item.text(0)
+        if text.startswith("▼"):
+            item.setText(0, "▶" + text[1:])
+
+    def _on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
+        """单击节点时切换展开/折叠状态（仅对有子节点的项）"""
+        if item.childCount() > 0:
+            item.setExpanded(not item.isExpanded())
 
     def _highlight_match_in_item(self, item: QTreeWidgetItem, query: str):
         """在树节点中高亮匹配词（使用 HTML 富文本，仅高亮匹配部分）"""
