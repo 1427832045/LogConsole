@@ -424,6 +424,9 @@ class MainWindow(QMainWindow):
         self.results_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.results_tree.customContextMenuRequested.connect(self.show_results_context_menu)
         self.results_tree.setItemDelegate(HighlightDelegate(self.results_tree))
+        # 确保显示折叠箭头
+        self.results_tree.setRootIsDecorated(True)
+        self.results_tree.setIndentation(20)
         self.results_tree.hide()
         splitter.addWidget(self.results_tree)
 
