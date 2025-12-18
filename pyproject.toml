@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logconsole"
+version = "0.1.0"
+description = "专业日志查看工具 - Material Design 3"
+authors = [{name = "LogConsole Team"}]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "PyQt5>=5.15.0",
+    "chardet>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "pytest-qt>=4.0.0",
+]
+
+[project.scripts]
+logconsole = "logconsole.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["logconsole/tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=logconsole --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["logconsole"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
