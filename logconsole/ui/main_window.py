@@ -1130,19 +1130,68 @@ class MainWindow(QMainWindow):
         self.keyword_highlight_manager.remove_keyword(keyword)
 
     def _on_keyword_highlight_changed(self):
-        """关键词高亮变化回调"""
+        """关键词高亮变化回调 - 使用增量刷新避免 UI 卡死"""
         keywords = self.keyword_highlight_manager.get_enabled_keywords()
 
-        # 更新主高亮器
+        # 更新主高亮器规则
         if self.highlighter:
             self.highlighter.set_user_keywords(keywords)
-            self.highlighter.rehighlight()
 
-        # 更新所有 Grep 标签页的高亮器
+        # 更新所有 Grep 标签页的高亮器规则
         for tab_info in self.grep_tabs.values():
             if tab_info.get("highlighter"):
                 tab_info["highlighter"].set_user_keywords(keywords)
-                tab_info["highlighter"].rehighlight()
+
+        # 延迟刷新，避免阻塞 UI
+        QTimer.singleShot(10, self._deferred_rehighlight)
+
+    def _deferred_rehighlight(self):
+        """延迟执行 rehighlight - 仅刷新可见区域"""
+        if not self.highlighter:
+            return
+
+        # 对于任何大小的文件，都使用可见区域刷新策略
+        self._rehighlight_visible_area(self.main_log_viewer, self.highlighter)
+
+        # 刷新 Grep 标签页（仅当前可见的）
+        current_tab = self.tab_widget.currentIndex()
+        if current_tab in self.grep_tabs:
+            tab_info = self.grep_tabs[current_tab]
+            if tab_info.get("highlighter") and tab_info.get("viewer"):
+                self._rehighlight_visible_area(tab_info["viewer"], tab_info["highlighter"])
+
+    def _rehighlight_visible_area(self, viewer, highlighter):
+        """仅重新高亮可见区域"""
+        if not viewer or not highlighter:
+            return
+
+        # 获取可见区域的第一个和最后一个 block
+        first_visible = viewer.firstVisibleBlock() if hasattr(viewer, 'firstVisibleBlock') else None
+
+        if first_visible:
+            # QPlainTextEdit: 使用 firstVisibleBlock
+            block = first_visible
+            viewport_height = viewer.viewport().height()
+            y = 0
+            while block.isValid() and y < viewport_height:
+                highlighter.rehighlightBlock(block)
+                y += viewer.blockBoundingRect(block).height()
+                block = block.next()
+        else:
+            # QTextEdit: 通过光标定位可见区域
+            doc = viewer.document()
+            cursor_top = viewer.cursorForPosition(viewer.viewport().rect().topLeft())
+            cursor_bottom = viewer.cursorForPosition(viewer.viewport().rect().bottomLeft())
+
+            start_block = cursor_top.block()
+            end_block = cursor_bottom.block()
+
+            block = start_block
+            while block.isValid():
+                highlighter.rehighlightBlock(block)
+                if block == end_block:
+                    break
+                block = block.next()
 
     def show_highlight_panel(self):
         """显示高亮管理面板"""
