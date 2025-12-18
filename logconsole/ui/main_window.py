@@ -819,8 +819,8 @@ class MainWindow(QMainWindow):
 
             l1_item.setExpanded(True)
 
-        # 动态调整 splitter 大小 - 根据内容自适应
-        self._adjust_results_tree_height()
+        # 设置搜索结果面板初始固定高度（用户可拖动调整）
+        self._set_initial_results_height()
 
     def _setup_tree_signals(self):
         """设置树控件信号（仅连接一次）"""
@@ -831,11 +831,11 @@ class MainWindow(QMainWindow):
 
     def _on_tree_item_expanded(self, item: QTreeWidgetItem):
         """树节点展开时的处理"""
-        self._adjust_results_tree_height()
+        pass  # 固定高度，不自动调整
 
     def _on_tree_item_collapsed(self, item: QTreeWidgetItem):
         """树节点折叠时的处理"""
-        self._adjust_results_tree_height()
+        pass  # 固定高度，不自动调整
 
     def _highlight_match_in_item(self, item: QTreeWidgetItem, query: str):
         """在树节点中高亮匹配词（使用 HTML 富文本，仅高亮匹配部分）"""
@@ -864,6 +864,21 @@ class MainWindow(QMainWindow):
                 item.setText(0, html_text)
         except re.error:
             pass
+
+    def _set_initial_results_height(self):
+        """设置搜索结果面板的初始固定高度（仅首次显示时调用）"""
+        if not self.results_tree.isVisible():
+            return
+
+        # 如果用户已手动调整过高度，保持用户设置
+        if hasattr(self, '_results_height_initialized') and self._results_height_initialized:
+            return
+
+        # 固定初始高度 200px
+        total_height = self.main_splitter.height()
+        results_height = 200
+        self.main_splitter.setSizes([total_height - results_height, results_height])
+        self._results_height_initialized = True
 
     def _adjust_results_tree_height(self):
         """根据内容自动调整结果树高度"""
