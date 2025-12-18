@@ -33,6 +33,8 @@ from .apple_hig_theme import (
     get_context_menu_style, get_grep_filter_bar_style, get_grep_tag_style,
     get_count_label_style, get_add_grep_dialog_style
 )
+from ..core.keyword_highlight import KeywordHighlightManager, PRESET_COLORS
+from .highlight_panel import HighlightManagePanel, ColorPickerDialog
 
 # 大文件阈值（字节），超过此大小使用虚拟滚动
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MB
@@ -86,13 +88,14 @@ class HighlightDelegate(QStyledItemDelegate):
 
 # ========== 现代化日志语法高亮器 ==========
 class ModernLogHighlighter(QSyntaxHighlighter):
-    """现代化日志语法高亮器 - 支持模板系统"""
+    """现代化日志语法高亮器 - 支持模板系统 + 用户关键词高亮"""
 
     def __init__(self, parent: QTextDocument, template: Optional[HighlightTemplate] = None):
         super().__init__(parent)
         self.template = template
         self.search_pattern = None
         self.compiled_rules = []
+        self.user_keyword_rules = []  # 用户关键词高亮规则
         self.apply_template(template)
 
     def apply_template(self, template: Optional[HighlightTemplate]):
@@ -157,14 +160,38 @@ class ModernLogHighlighter(QSyntaxHighlighter):
         else:
             self.search_pattern = None
 
+    def set_user_keywords(self, keywords: list):
+        """设置用户关键词高亮规则"""
+        import re
+        self.user_keyword_rules = []
+        for kw in keywords:
+            if not kw.enabled:
+                continue
+            try:
+                pattern = re.compile(re.escape(kw.keyword), re.IGNORECASE)
+                fmt = QTextCharFormat()
+                fmt.setForeground(QColor(kw.fg_color))
+                if kw.bg_color:
+                    fmt.setBackground(QColor(kw.bg_color))
+                if kw.bold:
+                    fmt.setFontWeight(QFont.Bold)
+                self.user_keyword_rules.append((kw.keyword, pattern, fmt))
+            except re.error:
+                pass
+
     def highlightBlock(self, text: str):
         """高亮单行文本"""
-        # 应用模板规则（按优先级）
+        # 1. 应用模板规则（按优先级）
         for rule_name, pattern, fmt, priority in self.compiled_rules:
             for match in pattern.finditer(text):
                 self.setFormat(match.start(), match.end() - match.start(), fmt)
 
-        # 搜索匹配高亮（最高优先级，覆盖所有其他格式）
+        # 2. 应用用户关键词高亮（优先级高于模板）
+        for keyword, pattern, fmt in self.user_keyword_rules:
+            for match in pattern.finditer(text):
+                self.setFormat(match.start(), match.end() - match.start(), fmt)
+
+        # 3. 搜索匹配高亮（最高优先级，覆盖所有其他格式）
         if self.search_pattern:
             for match in self.search_pattern.finditer(text):
                 self.setFormat(match.start(), match.end() - match.start(), self.search_highlight_fmt)
@@ -342,6 +369,7 @@ class MainWindow(QMainWindow):
         self.parser = LogParser()
         self.search_engine = SearchEngine()
         self.template_manager = TemplateManager()
+        self.keyword_highlight_manager = KeywordHighlightManager()
         self.lines = []
         self.grep_tabs = {}  # 存储 Grep 标签页 {tab_index: filters}
         self.active_search_context = None  # 当前搜索上下文
@@ -349,6 +377,10 @@ class MainWindow(QMainWindow):
         self.virtual_viewer = None  # 虚拟滚动查看器（大文件用）
         self.search_dialog = None  # 高级搜索弹窗
         self.search_results = []  # 多次搜索历史 [{search_id, query, ...}]
+        self.highlight_panel = None  # 高亮管理面板
+
+        # 监听关键词变化
+        self.keyword_highlight_manager.on_change(self._on_keyword_highlight_changed)
 
         self.init_ui()
         self.apply_professional_theme()
@@ -514,6 +546,12 @@ class MainWindow(QMainWindow):
         self.wrap_btn.clicked.connect(self.toggle_word_wrap)
         toolbar.addWidget(self.wrap_btn)
 
+        # 高亮管理按钮
+        highlight_btn = QPushButton("◆")
+        highlight_btn.setToolTip("Keyword Highlights (Ctrl+H)")
+        highlight_btn.clicked.connect(self.show_highlight_panel)
+        toolbar.addWidget(highlight_btn)
+
         # 添加弹性空间
         spacer = QWidget()
         spacer.setSizePolicy(QWidget().sizePolicy().Expanding, QWidget().sizePolicy().Preferred)
@@ -546,6 +584,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.open_file)
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self.export_log)
         QShortcut(QKeySequence("Ctrl+G"), self).activated.connect(self.jump_to_line)
+        QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.show_highlight_panel)
 
     def apply_professional_theme(self):
         """应用专业主题 - Apple HIG 风格"""
@@ -1085,7 +1124,35 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         menu.setStyleSheet(get_context_menu_style())
 
-        # Grep 动作
+        # ========== 高亮相关 ==========
+        # 检查是否已高亮
+        existing_kw = self.keyword_highlight_manager.find_keyword(selected_text)
+
+        if existing_kw:
+            # 已高亮：显示移除选项
+            remove_hl_action = QAction(f"Remove Highlight: \"{selected_text}\"", self)
+            remove_hl_action.triggered.connect(
+                lambda checked, k=selected_text: self._remove_keyword_highlight(k)
+            )
+            menu.addAction(remove_hl_action)
+        else:
+            # 未高亮：显示高亮子菜单（带颜色选择）
+            highlight_menu = QMenu(f"Highlight: \"{selected_text}\"", self)
+            highlight_menu.setStyleSheet(get_context_menu_style())
+
+            for color in PRESET_COLORS:
+                color_action = QAction(f"● {color['name']}", self)
+                color_action.setIcon(self._create_color_icon(color['fg']))
+                color_action.triggered.connect(
+                    lambda checked, k=selected_text, c=color: self._add_keyword_highlight(k, c)
+                )
+                highlight_menu.addAction(color_action)
+
+            menu.addMenu(highlight_menu)
+
+        menu.addSeparator()
+
+        # ========== Grep 相关 ==========
         grep_action = QAction(f"Grep: \"{selected_text}\"", self)
         grep_action.triggered.connect(lambda checked, k=selected_text: self.grep_to_new_tab(k))
         menu.addAction(grep_action)
@@ -1097,6 +1164,49 @@ class MainWindow(QMainWindow):
             menu.addAction(add_grep_action)
 
         menu.exec_(self.main_log_viewer.mapToGlobal(pos))
+
+    def _create_color_icon(self, color: str):
+        """创建颜色图标"""
+        from PyQt5.QtGui import QPixmap, QPainter
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(QColor(color))
+        return QIcon(pixmap)
+
+    def _add_keyword_highlight(self, keyword: str, color: dict):
+        """添加关键词高亮"""
+        self.keyword_highlight_manager.add_keyword(
+            keyword,
+            fg_color=color['fg'],
+            bg_color=color['bg']
+        )
+
+    def _remove_keyword_highlight(self, keyword: str):
+        """移除关键词高亮"""
+        self.keyword_highlight_manager.remove_keyword(keyword)
+
+    def _on_keyword_highlight_changed(self):
+        """关键词高亮变化回调"""
+        keywords = self.keyword_highlight_manager.get_enabled_keywords()
+
+        # 更新主高亮器
+        if self.highlighter:
+            self.highlighter.set_user_keywords(keywords)
+            self.highlighter.rehighlight()
+
+        # 更新所有 Grep 标签页的高亮器
+        for tab_info in self.grep_tabs.values():
+            if tab_info.get("highlighter"):
+                tab_info["highlighter"].set_user_keywords(keywords)
+                tab_info["highlighter"].rehighlight()
+
+    def show_highlight_panel(self):
+        """显示高亮管理面板"""
+        if self.highlight_panel is None:
+            self.highlight_panel = HighlightManagePanel(self, self.keyword_highlight_manager)
+            self.highlight_panel.highlight_changed.connect(self._on_keyword_highlight_changed)
+        self.highlight_panel.refresh_list()
+        self.highlight_panel.show()
+        self.highlight_panel.raise_()
 
     def grep_to_new_tab(self, keyword: str):
         """Grep 到新标签页"""

@@ -677,6 +677,139 @@ def get_minimap_style():
     """
 
 
+def get_color_picker_dialog_style():
+    """颜色选择对话框"""
+    return f"""
+        QDialog {{
+            background: {APPLE_COLORS['bg_elevated']};
+            color: {APPLE_COLORS['text_primary']};
+        }}
+        QLabel {{
+            color: {APPLE_COLORS['text_primary']};
+            font-size: 13px;
+        }}
+        QPushButton.colorBtn {{
+            border: 2px solid transparent;
+            border-radius: 6px;
+            min-width: 36px;
+            min-height: 36px;
+        }}
+        QPushButton.colorBtn:hover {{
+            border-color: {APPLE_COLORS['text_secondary']};
+        }}
+        QPushButton.colorBtn:checked {{
+            border-color: {APPLE_COLORS['accent']};
+            border-width: 3px;
+        }}
+        QDialogButtonBox QPushButton {{
+            background: {APPLE_COLORS['bg_hover']};
+            color: {APPLE_COLORS['text_primary']};
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+            min-width: 72px;
+        }}
+        QDialogButtonBox QPushButton:hover {{
+            background: {APPLE_COLORS['text_muted']};
+        }}
+        QDialogButtonBox QPushButton:default {{
+            background: {APPLE_COLORS['accent']};
+            color: #000000;
+        }}
+    """
+
+
+def get_highlight_panel_style():
+    """高亮管理面板"""
+    return f"""
+        QDialog {{
+            background: {APPLE_COLORS['bg_elevated']};
+            color: {APPLE_COLORS['text_primary']};
+        }}
+        QLabel {{
+            color: {APPLE_COLORS['text_primary']};
+            font-size: 13px;
+        }}
+        QListWidget {{
+            background: {APPLE_COLORS['bg_surface']};
+            color: {APPLE_COLORS['text_primary']};
+            border: 1px solid {APPLE_COLORS['border']};
+            border-radius: 8px;
+            padding: 4px;
+            font-size: 13px;
+        }}
+        QListWidget::item {{
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 2px;
+        }}
+        QListWidget::item:hover {{
+            background: {APPLE_COLORS['bg_hover']};
+        }}
+        QListWidget::item:selected {{
+            background: {APPLE_COLORS['accent_subtle']};
+        }}
+        QPushButton {{
+            background: {APPLE_COLORS['bg_hover']};
+            color: {APPLE_COLORS['text_primary']};
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+            min-width: 80px;
+        }}
+        QPushButton:hover {{
+            background: {APPLE_COLORS['text_muted']};
+        }}
+        QPushButton#primaryBtn {{
+            background: {APPLE_COLORS['accent']};
+            color: #000000;
+        }}
+        QPushButton#dangerBtn {{
+            background: {APPLE_COLORS['error']};
+            color: #FFFFFF;
+        }}
+        QLineEdit {{
+            background: {APPLE_COLORS['bg_hover']};
+            color: {APPLE_COLORS['text_primary']};
+            border: 1px solid transparent;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }}
+        QLineEdit:focus {{
+            border-color: {APPLE_COLORS['accent']};
+        }}
+        QComboBox {{
+            background: {APPLE_COLORS['bg_hover']};
+            color: {APPLE_COLORS['text_primary']};
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            min-width: 120px;
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            width: 20px;
+        }}
+        QComboBox::down-arrow {{
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {APPLE_COLORS['text_secondary']};
+        }}
+        QComboBox QAbstractItemView {{
+            background: {APPLE_COLORS['bg_elevated']};
+            color: {APPLE_COLORS['text_primary']};
+            border: 1px solid {APPLE_COLORS['border']};
+            border-radius: 6px;
+            selection-background-color: {APPLE_COLORS['accent_subtle']};
+        }}
+    """
+
+
 # 导出兼容
 SYSTEM_BLUE = APPLE_COLORS["accent"]
 SYSTEM_GREEN = APPLE_COLORS["success"]
