@@ -46,24 +46,32 @@ class HighlightDelegate(QStyledItemDelegate):
         style = option.widget.style() if option.widget else QApplication.style()
 
         # 初始化选项
-        self.initStyleOption(option, index)
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
 
         # 保存原始文本
-        original_text = option.text
+        original_text = opt.text
 
-        # 先让 Qt 绘制背景和 branch（折叠箭头）
-        option.text = ""
-        style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+        # 绘制背景（选中/悬停状态）- 不绘制文本
+        opt.text = ""
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
+
+        # 手动绘制 branch 装饰器（折叠箭头）
+        branch_rect = style.subElementRect(QStyle.SE_TreeViewDisclosureItem, opt, opt.widget)
+        if branch_rect.isValid():
+            branch_opt = QStyleOptionViewItem(opt)
+            branch_opt.rect = branch_rect
+            style.drawPrimitive(QStyle.PE_IndicatorBranch, branch_opt, painter, opt.widget)
 
         # 然后手动绘制 HTML 富文本
         if original_text:
             doc = QTextDocument()
-            doc.setDefaultFont(option.font)
+            doc.setDefaultFont(opt.font)
             doc.setDefaultStyleSheet(f"body {{ color: {APPLE_COLORS['text_primary']}; }}")
             doc.setHtml(f"<body>{original_text}</body>")
 
             # 计算文本绘制区域
-            text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, option, option.widget)
+            text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, opt, opt.widget)
 
             # 绘制文本 - 垂直居中
             painter.save()
