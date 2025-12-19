@@ -1572,6 +1572,8 @@ class MainWindow(QMainWindow):
         if self.virtual_viewer is None:
             self.virtual_viewer = VirtualLogViewer()
             self.virtual_viewer.context_menu_requested.connect(self.show_context_menu)
+            # 安装事件过滤器以支持选中高亮
+            self.virtual_viewer.text_view.viewport().installEventFilter(self)
 
         # 替换主标签页内容
         current_widget = self.tab_widget.widget(self.main_tab_index)
@@ -1652,6 +1654,9 @@ class MainWindow(QMainWindow):
             if highlighter:
                 highlighter.set_search_pattern(pattern, is_regex, case_sensitive)
                 QTimer.singleShot(50, highlighter.rehighlight)
+            elif ctx.get("is_virtual") and hasattr(viewer, 'set_search_pattern'):
+                # 大文件模式：使用 VirtualLogViewer 的高亮功能
+                viewer.set_search_pattern(pattern, is_regex, case_sensitive)
         else:
             self.results_tree.hide()
             self.search_panel.update_match_count(0, 0)
@@ -1669,10 +1674,14 @@ class MainWindow(QMainWindow):
 
     def clear_search(self):
         """清除搜索"""
-        # 清除所有视图的搜索高亮（大文件模式无高亮器）
+        # 清除所有视图的搜索高亮
         if self.highlighter:
             self.highlighter.set_search_pattern(None)
             self.highlighter.rehighlight()
+
+        # 大文件模式清除高亮
+        if self.is_large_file and self.virtual_viewer:
+            self.virtual_viewer.set_search_pattern(None)
 
         # 也清除 Grep 标签页的高亮
         for tab_info in self.grep_tabs.values():
@@ -2128,29 +2137,42 @@ class MainWindow(QMainWindow):
 
     def _on_selection_changed(self):
         """选中文本变化时，高亮所有相同词语"""
-        viewer = self.main_log_viewer
-        cursor = viewer.textCursor()
-        selected_text = cursor.selectedText().strip()
+        # 根据当前模式选择正确的 viewer
+        if self.is_large_file and self.virtual_viewer:
+            viewer = self.virtual_viewer
+            cursor = viewer.textCursor()
+            selected_text = cursor.selectedText().strip()
 
-        # 如果选中的词和上次相同，不重复处理
-        if selected_text == self._selection_highlight_word:
-            return
+            if selected_text == self._selection_highlight_word:
+                return
+            self._selection_highlight_word = selected_text
 
-        self._selection_highlight_word = selected_text
+            if not selected_text or len(selected_text) < 2 or len(selected_text) > 100:
+                viewer.clear_selection_highlight()
+                return
+            if '\u2029' in selected_text:
+                viewer.clear_selection_highlight()
+                return
 
-        # 如果没有选中文本或选中太短/太长，清除选中高亮层
-        if not selected_text or len(selected_text) < 2 or len(selected_text) > 100:
-            self.highlight_engine.clear_selection_highlight()
-            return
+            viewer.set_selection_highlight(selected_text)
+        else:
+            viewer = self.main_log_viewer
+            cursor = viewer.textCursor()
+            selected_text = cursor.selectedText().strip()
 
-        # 如果选中包含换行，不处理
-        if '\u2029' in selected_text:
-            self.highlight_engine.clear_selection_highlight()
-            return
+            if selected_text == self._selection_highlight_word:
+                return
+            self._selection_highlight_word = selected_text
 
-        # 使用 HighlightEngine 设置选中高亮
-        current_pos = (cursor.selectionStart(), cursor.selectionEnd())
-        self.highlight_engine.set_selection_highlight(selected_text, current_pos)
+            if not selected_text or len(selected_text) < 2 or len(selected_text) > 100:
+                self.highlight_engine.clear_selection_highlight()
+                return
+            if '\u2029' in selected_text:
+                self.highlight_engine.clear_selection_highlight()
+                return
+
+            current_pos = (cursor.selectionStart(), cursor.selectionEnd())
+            self.highlight_engine.set_selection_highlight(selected_text, current_pos)
 
     def _highlight_all_occurrences(self, viewer: QTextEdit, word: str):
         """高亮所有相同词语出现的位置（兼容旧调用）"""
@@ -2160,19 +2182,21 @@ class MainWindow(QMainWindow):
         """事件过滤器：监听鼠标事件处理选中高亮"""
         from PyQt5.QtCore import QEvent
 
-        # 只处理主日志查看器的 viewport
-        if obj == self.main_log_viewer.viewport():
+        # 获取当前活动的 viewer
+        current_viewer = self.virtual_viewer if (self.is_large_file and self.virtual_viewer) else self.main_log_viewer
+        target_viewport = current_viewer.text_view.viewport() if hasattr(current_viewer, 'text_view') else current_viewer.viewport()
+
+        if obj == target_viewport or obj == self.main_log_viewer.viewport():
             if event.type() == QEvent.MouseButtonPress:
-                # 鼠标按下，标记正在选择
                 self._is_selecting = True
-                # 清除选中高亮层，保留关键词高亮
-                self.highlight_engine.clear_selection_highlight()
+                if self.is_large_file and self.virtual_viewer:
+                    self.virtual_viewer.clear_selection_highlight()
+                else:
+                    self.highlight_engine.clear_selection_highlight()
                 self._selection_highlight_word = None
             elif event.type() == QEvent.MouseMove and self._is_selecting:
-                # 拖拽过程中，实时显示当前选中文本的橙色高亮
                 self._highlight_current_selection_only()
             elif event.type() == QEvent.MouseButtonRelease:
-                # 鼠标释放，处理完整高亮（当前选中 + 其他匹配项）
                 if self._is_selecting:
                     self._is_selecting = False
                     self._on_selection_changed()
@@ -2181,13 +2205,18 @@ class MainWindow(QMainWindow):
 
     def _highlight_current_selection_only(self):
         """仅高亮当前选中的文本（拖拽过程中使用）"""
-        cursor = self.main_log_viewer.textCursor()
-        selected_text = cursor.selectedText().strip()
-
-        if not selected_text or len(selected_text) < 2:
-            self.highlight_engine.clear_selection_highlight()
-            return
-
-        # 使用引擎设置临时选中高亮
-        current_pos = (cursor.selectionStart(), cursor.selectionEnd())
-        self.highlight_engine.set_selection_highlight(selected_text, current_pos)
+        if self.is_large_file and self.virtual_viewer:
+            cursor = self.virtual_viewer.textCursor()
+            selected_text = cursor.selectedText().strip()
+            if not selected_text or len(selected_text) < 2:
+                self.virtual_viewer.clear_selection_highlight()
+                return
+            self.virtual_viewer.set_selection_highlight(selected_text)
+        else:
+            cursor = self.main_log_viewer.textCursor()
+            selected_text = cursor.selectedText().strip()
+            if not selected_text or len(selected_text) < 2:
+                self.highlight_engine.clear_selection_highlight()
+                return
+            current_pos = (cursor.selectionStart(), cursor.selectionEnd())
+            self.highlight_engine.set_selection_highlight(selected_text, current_pos)
