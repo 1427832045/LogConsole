@@ -106,16 +106,17 @@ class HighlightEngine(QObject):
         doc = self.viewer.document()
 
         try:
-            pattern = re.compile(re.escape(word), re.IGNORECASE)
+            # 使用 re.escape 确保特殊字符被正确转义
+            escaped_word = re.escape(word)
+            pattern = re.compile(escaped_word, re.IGNORECASE)
 
-            # 仅在可见区域搜索（性能优化）
+            # 获取可见范围（带缓冲区）
             start_block, end_block = self._get_visible_range()
             block = doc.findBlockByNumber(start_block)
+            processed = 0
+            max_blocks = end_block - start_block + 1
 
-            for _ in range(end_block - start_block + 1):
-                if not block.isValid():
-                    break
-
+            while block.isValid() and processed < max_blocks:
                 text = block.text()
                 block_pos = block.position()
 
@@ -126,12 +127,13 @@ class HighlightEngine(QObject):
                     cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
 
                     fmt = QTextCharFormat()
-                    # 当前选中位置用不同颜色
-                    if current_pos and match.start() + block_pos == current_pos[0]:
+                    # 当前选中位置用橙色
+                    if current_pos and block_pos + match.start() == current_pos[0]:
                         fmt.setBackground(QColor("#FF9500"))
                         fmt.setForeground(QColor("#FFFFFF"))
                         fmt.setFontWeight(QFont.Bold)
                     else:
+                        # 其他匹配项用黄色
                         fmt.setBackground(QColor("#FFEB3B"))
                         fmt.setForeground(QColor("#1A1A1A"))
 
@@ -140,6 +142,7 @@ class HighlightEngine(QObject):
                     selections.append(sel)
 
                 block = block.next()
+                processed += 1
 
         except re.error:
             pass

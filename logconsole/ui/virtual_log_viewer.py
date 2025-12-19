@@ -2,12 +2,13 @@
 虚拟滚动日志查看器 - 支持 GB 级文件秒开
 只渲染可见区域的行，内存占用极低
 """
+import re
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QScrollBar, QPlainTextEdit,
-    QHBoxLayout, QFrame
+    QHBoxLayout, QFrame, QTextEdit
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QTextCursor, QColor, QPalette
+from PyQt5.QtGui import QFont, QTextCursor, QColor, QPalette, QTextCharFormat
 
 
 class VirtualLogViewer(QWidget):
@@ -16,6 +17,7 @@ class VirtualLogViewer(QWidget):
     # 信号
     selection_changed = pyqtSignal(str)  # 选中文本变化
     context_menu_requested = pyqtSignal(object)  # 右键菜单请求
+    scroll_changed = pyqtSignal()  # 滚动变化信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -24,6 +26,11 @@ class VirtualLogViewer(QWidget):
         self.line_height = 18  # 行高（像素）
         self.current_top_line = 0  # 当前顶部行号
         self.show_line_numbers = True
+
+        # 高亮状态
+        self._search_pattern = None  # 搜索模式
+        self._selection_word = None  # 选中词高亮
+        self._pending_highlight = False  # 是否有待处理的高亮
 
         self.init_ui()
 
@@ -133,6 +140,8 @@ class VirtualLogViewer(QWidget):
         """滚动事件处理"""
         self.current_top_line = value
         self.render_visible_lines()
+        self._apply_highlights()
+        self.scroll_changed.emit()
 
     def scroll_to_line(self, line_num: int, highlight: bool = True):
         """滚动到指定行"""
@@ -215,3 +224,85 @@ class VirtualLogViewer(QWidget):
     def mapToGlobal(self, pos):
         """兼容 QTextEdit 接口"""
         return self.text_view.mapToGlobal(pos)
+
+    # ========== 高亮功能 ==========
+
+    def set_search_pattern(self, pattern: str, is_regex: bool = False, case_sensitive: bool = False):
+        """设置搜索高亮模式"""
+        if pattern:
+            try:
+                flags = 0 if case_sensitive else re.IGNORECASE
+                if is_regex:
+                    self._search_pattern = re.compile(pattern, flags)
+                else:
+                    self._search_pattern = re.compile(re.escape(pattern), flags)
+            except re.error:
+                self._search_pattern = None
+        else:
+            self._search_pattern = None
+        self._apply_highlights()
+
+    def set_selection_highlight(self, word: str):
+        """设置选中词高亮"""
+        if word and len(word) >= 2:
+            try:
+                self._selection_word = re.compile(re.escape(word), re.IGNORECASE)
+            except re.error:
+                self._selection_word = None
+        else:
+            self._selection_word = None
+        self._apply_highlights()
+
+    def clear_selection_highlight(self):
+        """清除选中词高亮"""
+        self._selection_word = None
+        self._apply_highlights()
+
+    def _apply_highlights(self):
+        """应用高亮到当前可见区域（使用 ExtraSelections）"""
+        selections = []
+        doc = self.text_view.document()
+
+        # 搜索高亮（黄色背景）
+        if self._search_pattern:
+            search_fmt = QTextCharFormat()
+            search_fmt.setBackground(QColor("#FFE66D"))
+            search_fmt.setForeground(QColor("#000000"))
+            search_fmt.setFontWeight(QFont.Bold)
+
+            block = doc.begin()
+            while block.isValid():
+                text = block.text()
+                block_pos = block.position()
+                for match in self._search_pattern.finditer(text):
+                    sel = QTextEdit.ExtraSelection()
+                    cursor = QTextCursor(doc)
+                    cursor.setPosition(block_pos + match.start())
+                    cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
+                    sel.cursor = cursor
+                    sel.format = search_fmt
+                    selections.append(sel)
+                block = block.next()
+
+        # 选中词高亮（橙色背景）
+        if self._selection_word:
+            sel_fmt = QTextCharFormat()
+            sel_fmt.setBackground(QColor("#FF9500"))
+            sel_fmt.setForeground(QColor("#FFFFFF"))
+            sel_fmt.setFontWeight(QFont.Bold)
+
+            block = doc.begin()
+            while block.isValid():
+                text = block.text()
+                block_pos = block.position()
+                for match in self._selection_word.finditer(text):
+                    sel = QTextEdit.ExtraSelection()
+                    cursor = QTextCursor(doc)
+                    cursor.setPosition(block_pos + match.start())
+                    cursor.setPosition(block_pos + match.end(), QTextCursor.KeepAnchor)
+                    sel.cursor = cursor
+                    sel.format = sel_fmt
+                    selections.append(sel)
+                block = block.next()
+
+        self.text_view.setExtraSelections(selections)
