@@ -1,68 +1,89 @@
 """
-Swiss Spa Premium Theme - 真正的极简高端
-设计理念: 温暖灰调 + 大量留白 + 精致细节
-参考: Linear.app, Notion, Raycast
+Neo-Terminal Theme - Retro-Futuristic Command Center
+Design Philosophy: Classic terminal aesthetics + modern refinement
+Visual Identity: Phosphor green glow, CRT scanlines, monospace precision
 """
 
 # ============================================================
-# COLOR PALETTE - Warm Neutral (不是冷冰冰的纯黑)
+# COLOR PALETTE - Phosphor Green Terminal
 # ============================================================
-APPLE_COLORS = {
-    # 背景层级 - 温暖的深灰，不是纯黑
-    "bg_base": "#1A1A1C",        # 最深，主编辑区
-    "bg_surface": "#232326",     # 工具栏/状态栏
-    "bg_elevated": "#2C2C2F",    # 悬浮/下拉
-    "bg_hover": "#38383B",       # 悬停状态
+TERMINAL_COLORS = {
+    # Background hierarchy - Deep space black
+    "bg_void": "#000000",           # Pure black for contrast
+    "bg_base": "#0D1117",           # GitHub dark - main editor
+    "bg_surface": "#161B22",        # Elevated surfaces
+    "bg_elevated": "#1C2128",       # Dialogs, dropdowns
+    "bg_hover": "#21262D",          # Hover states
+    "bg_active": "#2D333B",         # Active/pressed states
 
-    # 文字层级 - 柔和的白，不是刺眼纯白
-    "text_primary": "#F5F5F7",   # 主文字
-    "text_secondary": "#A1A1A6", # 次要文字
-    "text_tertiary": "#6E6E73",  # 占位符/禁用
-    "text_muted": "#48484A",     # 极淡文字
+    # Phosphor Green - Primary accent
+    "phosphor": "#00FF41",          # Classic terminal green
+    "phosphor_dim": "#00CC33",      # Dimmed green
+    "phosphor_glow": "rgba(0, 255, 65, 0.15)",  # Subtle glow
+    "phosphor_bright": "#39FF14",   # Neon bright for highlights
 
-    # 唯一强调色 - 温暖的琥珀色 (不是冷蓝)
-    "accent": "#F5A623",         # 主强调 - 温暖琥珀
-    "accent_hover": "#FFBC42",   # 悬停
-    "accent_subtle": "rgba(245, 166, 35, 0.12)",  # 背景
+    # Amber - Secondary accent (like old monitors)
+    "amber": "#FFB000",             # Classic amber
+    "amber_dim": "#CC8800",         # Dimmed amber
+    "amber_glow": "rgba(255, 176, 0, 0.12)",
 
-    # 边框 - 极其微妙
-    "border": "rgba(255, 255, 255, 0.06)",
-    "border_focus": "rgba(245, 166, 35, 0.5)",
+    # Text hierarchy
+    "text_primary": "#E6EDF3",      # Bright white (not pure)
+    "text_secondary": "#8B949E",    # Muted gray
+    "text_tertiary": "#484F58",     # Very muted
+    "text_ghost": "#30363D",        # Almost invisible
 
-    # 语义色 (仅必要时使用)
-    "success": "#34C759",
-    "warning": "#FF9500",
-    "error": "#FF3B30",
+    # Semantic colors
+    "error": "#F85149",             # Red alert
+    "warning": "#D29922",           # Warning amber
+    "success": "#3FB950",           # Success green
+    "info": "#58A6FF",              # Info blue
 
-    # 兼容旧 API
-    "system_blue": "#F5A623",    # 统一用琥珀色
-    "system_green": "#34C759",
-    "system_red": "#FF3B30",
-    "system_gray": "#8E8E93",
-    "system_gray2": "#636366",
-    "system_gray3": "#48484A",
-    "system_gray4": "#3A3A3C",
-    "system_gray5": "#2C2C2E",
-    "system_gray6": "#1C1C1E",
-    "label_primary": "#F5F5F7",
-    "label_secondary": "#A1A1A6",
-    "label_tertiary": "#6E6E73",
-    "label_quaternary": "#48484A",
-    "bg_primary": "#1A1A1C",
-    "bg_secondary": "#232326",
-    "bg_tertiary": "#2C2C2F",
-    "separator": "rgba(255, 255, 255, 0.06)",
-    "separator_opaque": "#2C2C2F",
+    # Borders - Very subtle
+    "border": "rgba(48, 54, 61, 0.8)",
+    "border_focus": "rgba(0, 255, 65, 0.5)",
+    "border_glow": "rgba(0, 255, 65, 0.3)",
+
+    # Log level colors (enhanced visibility)
+    "log_error": "#FF6B6B",
+    "log_warn": "#FFE66D",
+    "log_info": "#4ECDC4",
+    "log_debug": "#95A5A6",
+    "log_trace": "#6C7A89",
+
+    # Backward compatibility aliases (for existing code)
+    "accent": "#00FF41",             # Maps to phosphor
+    "accent_hover": "#39FF14",       # Maps to phosphor_bright
+    "accent_subtle": "rgba(0, 255, 65, 0.15)",  # Maps to phosphor_glow
+    "text_muted": "#30363D",         # Maps to text_ghost
+    "label_primary": "#E6EDF3",      # Maps to text_primary
+    "label_secondary": "#8B949E",    # Maps to text_secondary
+    "label_tertiary": "#484F58",     # Maps to text_tertiary
+    "label_quaternary": "#30363D",   # Maps to text_ghost
+    "separator": "rgba(48, 54, 61, 0.8)",  # Maps to border
+    "separator_opaque": "#21262D",   # Maps to bg_hover
+    "bg_primary": "#0D1117",         # Maps to bg_base
+    "bg_secondary": "#161B22",       # Maps to bg_surface
+    "bg_tertiary": "#1C2128",        # Maps to bg_elevated
+    "system_blue": "#00FF41",        # Maps to phosphor
+    "system_green": "#3FB950",       # Maps to success
+    "system_red": "#F85149",         # Maps to error
+    "system_gray": "#8B949E",
+    "system_gray2": "#6E7681",
+    "system_gray3": "#484F58",
+    "system_gray4": "#30363D",
+    "system_gray5": "#21262D",
+    "system_gray6": "#161B22",
 }
 
 # ============================================================
-# TYPOGRAPHY - 精致排版
+# TYPOGRAPHY - Monospace Excellence
 # ============================================================
-APPLE_FONT_FAMILY = "'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif"
-APPLE_MONO_FONT = "'SF Mono', 'JetBrains Mono', 'Fira Code', Menlo, monospace"
+TERMINAL_FONT = "'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'IBM Plex Mono', 'Cascadia Code', monospace"
+TERMINAL_FONT_UI = "'JetBrains Mono', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
 
 # ============================================================
-# SPACING - 8px Grid (严格遵守)
+# SPACING - 8px Grid
 # ============================================================
 SPACING = {
     "xs": "4px",
@@ -70,76 +91,94 @@ SPACING = {
     "md": "16px",
     "lg": "24px",
     "xl": "32px",
-    "2xl": "48px",
 }
 
 # ============================================================
-# ICONS - 精简的 Unicode 符号
+# ICONS - Terminal-style Unicode
 # ============================================================
 ICONS = {
     "search": "⌕",
     "close": "×",
-    "arrow_up": "↑",
-    "arrow_down": "↓",
+    "arrow_up": "▲",
+    "arrow_down": "▼",
     "check": "✓",
     "chevron": "›",
-    "file": "◇",
-    "copy": "⧉",
-    "delete": "−",
+    "file": "◈",
+    "folder": "▤",
+    "terminal": "▸",
+    "copy": "⎘",
+    "delete": "⌫",
     "add": "+",
+    "filter": "⫧",
+    "cursor": "█",
 }
+
+# ============================================================
+# CRT EFFECTS - Subtle scanlines and glow
+# ============================================================
+CRT_SCANLINE_OPACITY = 0.03  # Very subtle
+CRT_GLOW_BLUR = "2px"
+CRT_VIGNETTE = "radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%)"
 
 
 def get_main_window_style():
-    """主窗口 - 温暖深色基底"""
+    """Main window - Deep space command center"""
     return f"""
         QMainWindow {{
-            background-color: {APPLE_COLORS['bg_base']};
+            background-color: {TERMINAL_COLORS['bg_base']};
         }}
 
-        /* 编辑器区域 - 大量呼吸空间 */
+        /* Editor area - Terminal aesthetic */
         QTextEdit, QPlainTextEdit {{
-            background-color: {APPLE_COLORS['bg_base']};
-            color: {APPLE_COLORS['text_primary']};
+            background-color: {TERMINAL_COLORS['bg_base']};
+            color: {TERMINAL_COLORS['text_primary']};
             border: none;
-            padding: 24px 32px;
-            font-family: {APPLE_MONO_FONT};
+            padding: 20px 24px;
+            font-family: {TERMINAL_FONT};
             font-size: 13px;
-            line-height: 1.7;
-            letter-spacing: 0.02em;
-            selection-background-color: {APPLE_COLORS['accent_subtle']};
-            selection-color: {APPLE_COLORS['text_primary']};
+            line-height: 1.6;
+            letter-spacing: 0.01em;
+            selection-background-color: {TERMINAL_COLORS['phosphor_glow']};
+            selection-color: {TERMINAL_COLORS['phosphor']};
         }}
 
-        /* 状态栏 - 极简 */
+        /* Status bar - Minimal terminal prompt style */
         QStatusBar {{
-            background-color: {APPLE_COLORS['bg_surface']};
-            color: {APPLE_COLORS['text_tertiary']};
+            background-color: {TERMINAL_COLORS['bg_surface']};
+            color: {TERMINAL_COLORS['text_tertiary']};
             border: none;
+            border-top: 1px solid {TERMINAL_COLORS['border']};
             min-height: 28px;
-            padding: 0 16px;
+            padding: 0 12px;
+            font-family: {TERMINAL_FONT};
+            font-size: 11px;
         }}
         QStatusBar QLabel {{
-            color: {APPLE_COLORS['text_tertiary']};
-            font-family: {APPLE_FONT_FAMILY};
+            color: {TERMINAL_COLORS['text_secondary']};
+            font-family: {TERMINAL_FONT};
             font-size: 11px;
-            font-weight: 400;
-            padding: 0 12px;
+            padding: 0 8px;
+        }}
+        QStatusBar::item {{
+            border: none;
         }}
 
-        /* 滚动条 - 几乎隐形 */
+        /* Scrollbar - Thin phosphor accent */
         QScrollBar:vertical {{
             background: transparent;
-            width: 6px;
-            margin: 4px 2px;
+            width: 8px;
+            margin: 0;
         }}
         QScrollBar::handle:vertical {{
-            background: {APPLE_COLORS['text_muted']};
-            border-radius: 3px;
-            min-height: 32px;
+            background: {TERMINAL_COLORS['text_ghost']};
+            border-radius: 4px;
+            min-height: 40px;
         }}
         QScrollBar::handle:vertical:hover {{
-            background: {APPLE_COLORS['text_tertiary']};
+            background: {TERMINAL_COLORS['phosphor_dim']};
+        }}
+        QScrollBar::handle:vertical:pressed {{
+            background: {TERMINAL_COLORS['phosphor']};
         }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
         QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
@@ -149,16 +188,19 @@ def get_main_window_style():
 
         QScrollBar:horizontal {{
             background: transparent;
-            height: 6px;
-            margin: 2px 4px;
+            height: 8px;
+            margin: 0;
         }}
         QScrollBar::handle:horizontal {{
-            background: {APPLE_COLORS['text_muted']};
-            border-radius: 3px;
-            min-width: 32px;
+            background: {TERMINAL_COLORS['text_ghost']};
+            border-radius: 4px;
+            min-width: 40px;
         }}
         QScrollBar::handle:horizontal:hover {{
-            background: {APPLE_COLORS['text_tertiary']};
+            background: {TERMINAL_COLORS['phosphor_dim']};
+        }}
+        QScrollBar::handle:horizontal:pressed {{
+            background: {TERMINAL_COLORS['phosphor']};
         }}
         QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
         QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
@@ -166,83 +208,99 @@ def get_main_window_style():
             background: transparent;
         }}
 
-        /* 分割器 - 几乎看不见 */
+        /* Splitter - Subtle divider */
         QSplitter::handle {{
-            background: {APPLE_COLORS['border']};
+            background: {TERMINAL_COLORS['border']};
         }}
         QSplitter::handle:vertical {{ height: 1px; }}
         QSplitter::handle:horizontal {{ width: 1px; }}
+        QSplitter::handle:hover {{
+            background: {TERMINAL_COLORS['phosphor_dim']};
+        }}
 
-        /* 对话框 */
+        /* Dialogs */
         QMessageBox, QInputDialog, QFileDialog {{
-            background-color: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
+            background-color: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
         }}
         QMessageBox QLabel, QInputDialog QLabel {{
-            color: {APPLE_COLORS['text_primary']};
+            color: {TERMINAL_COLORS['text_primary']};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 13px;
         }}
         QMessageBox QPushButton, QInputDialog QPushButton {{
-            background-color: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
-            padding: 8px 20px;
-            font-size: 13px;
+            background-color: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-family: {TERMINAL_FONT_UI};
+            font-size: 12px;
             font-weight: 500;
             min-width: 72px;
         }}
         QMessageBox QPushButton:hover, QInputDialog QPushButton:hover {{
-            background-color: {APPLE_COLORS['text_muted']};
+            background-color: {TERMINAL_COLORS['bg_active']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
         }}
         QMessageBox QPushButton:default {{
-            background-color: {APPLE_COLORS['accent']};
-            color: #000000;
+            background-color: {TERMINAL_COLORS['phosphor_dim']};
+            color: {TERMINAL_COLORS['bg_base']};
+            border-color: {TERMINAL_COLORS['phosphor']};
+        }}
+        QMessageBox QPushButton:default:hover {{
+            background-color: {TERMINAL_COLORS['phosphor']};
         }}
     """
 
 
 def get_toolbar_style():
-    """工具栏 - 极简图标式"""
+    """Toolbar - Minimal terminal command bar"""
     return f"""
         QToolBar {{
-            background-color: {APPLE_COLORS['bg_surface']};
+            background-color: {TERMINAL_COLORS['bg_surface']};
             border: none;
-            padding: 8px 16px;
+            border-bottom: 1px solid {TERMINAL_COLORS['border']};
+            padding: 6px 12px;
             spacing: 4px;
         }}
         QToolBar::separator {{
-            width: 0;
-            margin: 0 8px;
+            width: 1px;
+            background: {TERMINAL_COLORS['border']};
+            margin: 4px 8px;
         }}
 
-        /* 工具栏按钮 - 纯文字，无边框 */
+        /* Toolbar buttons - Terminal command style */
         QToolBar QPushButton {{
             background: transparent;
-            color: {APPLE_COLORS['text_secondary']};
-            border: none;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-family: {APPLE_FONT_FAMILY};
-            font-size: 13px;
+            color: {TERMINAL_COLORS['text_secondary']};
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-family: {TERMINAL_FONT_UI};
+            font-size: 12px;
             font-weight: 500;
         }}
         QToolBar QPushButton:hover {{
-            background-color: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
+            background-color: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['phosphor']};
+            border-color: {TERMINAL_COLORS['border']};
         }}
         QToolBar QPushButton:pressed {{
-            background-color: {APPLE_COLORS['text_muted']};
+            background-color: {TERMINAL_COLORS['bg_active']};
+            color: {TERMINAL_COLORS['phosphor_bright']};
         }}
         QToolBar QPushButton:checked {{
-            color: {APPLE_COLORS['accent']};
+            color: {TERMINAL_COLORS['phosphor']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
+            background-color: {TERMINAL_COLORS['phosphor_glow']};
         }}
 
-        /* 标签文字 */
+        /* Labels in toolbar */
         QToolBar QLabel {{
-            color: {APPLE_COLORS['text_tertiary']};
+            color: {TERMINAL_COLORS['text_tertiary']};
+            font-family: {TERMINAL_FONT};
             font-size: 11px;
-            font-weight: 500;
             letter-spacing: 0.05em;
             padding: 0 8px;
         }}
@@ -250,183 +308,220 @@ def get_toolbar_style():
 
 
 def get_tab_widget_style():
-    """标签页 - 精致下划线"""
+    """Tab bar - Terminal session tabs"""
     return f"""
         QTabWidget::pane {{
             border: none;
-            background: {APPLE_COLORS['bg_base']};
+            background: {TERMINAL_COLORS['bg_base']};
         }}
 
         QTabBar {{
-            background: {APPLE_COLORS['bg_surface']};
+            background: {TERMINAL_COLORS['bg_surface']};
+            border-bottom: 1px solid {TERMINAL_COLORS['border']};
         }}
         QTabBar::tab {{
             background: transparent;
-            color: {APPLE_COLORS['text_tertiary']};
+            color: {TERMINAL_COLORS['text_tertiary']};
             padding: 10px 16px;
             margin: 0;
             border: none;
             border-bottom: 2px solid transparent;
-            font-family: {APPLE_FONT_FAMILY};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 12px;
             font-weight: 500;
         }}
         QTabBar::tab:selected {{
-            color: {APPLE_COLORS['text_primary']};
-            border-bottom: 2px solid {APPLE_COLORS['accent']};
+            color: {TERMINAL_COLORS['phosphor']};
+            border-bottom: 2px solid {TERMINAL_COLORS['phosphor']};
+            background: {TERMINAL_COLORS['phosphor_glow']};
         }}
         QTabBar::tab:hover:!selected {{
-            color: {APPLE_COLORS['text_secondary']};
+            color: {TERMINAL_COLORS['text_primary']};
+            background: {TERMINAL_COLORS['bg_hover']};
         }}
 
-        /* 关闭按钮 */
+        /* Close button on tabs */
         QTabBar::close-button {{
             image: none;
             subcontrol-position: right;
             padding: 4px;
+            margin-left: 4px;
         }}
         QTabBar::close-button:hover {{
-            background: {APPLE_COLORS['error']};
-            border-radius: 3px;
+            background: {TERMINAL_COLORS['error']};
+            border-radius: 2px;
         }}
     """
 
 
 def get_combobox_style():
-    """下拉框 - 简洁"""
+    """Combobox - Terminal dropdown selector"""
     return f"""
         QComboBox {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 6px 12px;
             padding-right: 28px;
-            font-family: {APPLE_FONT_FAMILY};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 12px;
             min-width: 100px;
         }}
         QComboBox:hover {{
-            background: {APPLE_COLORS['text_muted']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
+        }}
+        QComboBox:focus {{
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
         QComboBox::drop-down {{
             border: none;
-            width: 20px;
+            width: 24px;
         }}
         QComboBox::down-arrow {{
             image: none;
             border-left: 4px solid transparent;
             border-right: 4px solid transparent;
-            border-top: 5px solid {APPLE_COLORS['text_secondary']};
+            border-top: 5px solid {TERMINAL_COLORS['text_secondary']};
             margin-right: 8px;
         }}
         QComboBox QAbstractItemView {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid {APPLE_COLORS['border']};
-            border-radius: 8px;
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 4px;
-            selection-background-color: {APPLE_COLORS['accent_subtle']};
+            selection-background-color: {TERMINAL_COLORS['phosphor_glow']};
+            selection-color: {TERMINAL_COLORS['phosphor']};
+            outline: none;
         }}
         QComboBox QAbstractItemView::item {{
             padding: 8px 12px;
-            border-radius: 4px;
+            border-radius: 2px;
         }}
         QComboBox QAbstractItemView::item:hover {{
-            background: {APPLE_COLORS['bg_hover']};
+            background: {TERMINAL_COLORS['bg_hover']};
+        }}
+        QComboBox QAbstractItemView::item:selected {{
+            background: {TERMINAL_COLORS['phosphor_glow']};
+            color: {TERMINAL_COLORS['phosphor']};
         }}
     """
 
 
 def get_tree_widget_style():
-    """树形控件 - 搜索结果 (极简风格，原生折叠箭头)"""
+    """Tree widget - Terminal file browser style"""
     return f"""
         QTreeWidget {{
-            background: {APPLE_COLORS['bg_surface']};
-            color: {APPLE_COLORS['text_primary']};
+            background: {TERMINAL_COLORS['bg_surface']};
+            color: {TERMINAL_COLORS['text_primary']};
             border: none;
-            font-family: {APPLE_FONT_FAMILY};
+            font-family: {TERMINAL_FONT};
             font-size: 12px;
             padding: 8px;
             outline: none;
+            alternate-background-color: {TERMINAL_COLORS['bg_base']};
         }}
         QTreeWidget::item {{
-            padding: 5px 8px;
-            border-radius: 4px;
+            padding: 6px 8px;
+            border-radius: 2px;
             margin: 1px 0;
         }}
         QTreeWidget::item:hover {{
-            background: {APPLE_COLORS['bg_hover']};
+            background: {TERMINAL_COLORS['bg_hover']};
         }}
         QTreeWidget::item:selected {{
-            background: {APPLE_COLORS['accent_subtle']};
-            color: {APPLE_COLORS['text_primary']};
+            background: {TERMINAL_COLORS['phosphor_glow']};
+            color: {TERMINAL_COLORS['phosphor']};
         }}
         QTreeWidget::branch {{
             background: transparent;
         }}
+        QTreeWidget::branch:has-siblings:!adjoins-item {{
+            border-image: none;
+        }}
+        QTreeWidget::branch:has-siblings:adjoins-item {{
+            border-image: none;
+        }}
+        QTreeWidget::branch:!has-children:!has-siblings:adjoins-item {{
+            border-image: none;
+        }}
         QHeaderView::section {{
-            background: {APPLE_COLORS['bg_surface']};
-            color: {APPLE_COLORS['text_secondary']};
+            background: {TERMINAL_COLORS['bg_surface']};
+            color: {TERMINAL_COLORS['text_secondary']};
             border: none;
+            border-bottom: 1px solid {TERMINAL_COLORS['border']};
             padding: 8px;
+            font-family: {TERMINAL_FONT_UI};
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }}
     """
 
 
 def get_search_panel_style():
-    """搜索面板 - 浮动感"""
+    """Search panel - Command input style"""
     return f"""
         ModernSearchPanel {{
-            background: {APPLE_COLORS['bg_surface']};
+            background: {TERMINAL_COLORS['bg_surface']};
             border: none;
+            border-bottom: 1px solid {TERMINAL_COLORS['border']};
         }}
 
         QLineEdit {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid transparent;
-            border-radius: 8px;
+            background: {TERMINAL_COLORS['bg_base']};
+            color: {TERMINAL_COLORS['phosphor']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 10px 14px;
-            font-family: {APPLE_FONT_FAMILY};
+            font-family: {TERMINAL_FONT};
             font-size: 14px;
-            selection-background-color: {APPLE_COLORS['accent_subtle']};
+            selection-background-color: {TERMINAL_COLORS['phosphor_glow']};
+            selection-color: {TERMINAL_COLORS['phosphor_bright']};
         }}
         QLineEdit:focus {{
-            border: 1px solid {APPLE_COLORS['accent']};
-            background: {APPLE_COLORS['bg_elevated']};
+            border-color: {TERMINAL_COLORS['phosphor']};
+            background: {TERMINAL_COLORS['bg_void']};
         }}
         QLineEdit::placeholder {{
-            color: {APPLE_COLORS['text_tertiary']};
+            color: {TERMINAL_COLORS['text_tertiary']};
         }}
 
         QPushButton {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 8px 12px;
-            font-size: 13px;
+            font-family: {TERMINAL_FONT_UI};
+            font-size: 12px;
             font-weight: 500;
         }}
         QPushButton:hover {{
-            background: {APPLE_COLORS['text_muted']};
+            background: {TERMINAL_COLORS['bg_active']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
+            color: {TERMINAL_COLORS['phosphor']};
+        }}
+        QPushButton:pressed {{
+            background: {TERMINAL_COLORS['phosphor_glow']};
         }}
 
         QPushButton#closeBtn {{
             background: transparent;
-            color: {APPLE_COLORS['text_tertiary']};
+            color: {TERMINAL_COLORS['text_tertiary']};
+            border: none;
             padding: 4px;
             font-size: 16px;
         }}
         QPushButton#closeBtn:hover {{
-            color: {APPLE_COLORS['error']};
+            color: {TERMINAL_COLORS['error']};
         }}
 
         QCheckBox {{
-            color: {APPLE_COLORS['text_secondary']};
+            color: {TERMINAL_COLORS['text_secondary']};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 12px;
             spacing: 6px;
         }}
@@ -434,85 +529,98 @@ def get_search_panel_style():
             width: 14px;
             height: 14px;
             border-radius: 3px;
-            border: 1px solid {APPLE_COLORS['text_muted']};
+            border: 1px solid {TERMINAL_COLORS['text_tertiary']};
             background: transparent;
         }}
+        QCheckBox::indicator:hover {{
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
+        }}
         QCheckBox::indicator:checked {{
-            background: {APPLE_COLORS['accent']};
-            border-color: {APPLE_COLORS['accent']};
+            background: {TERMINAL_COLORS['phosphor']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
 
         QLabel {{
-            color: {APPLE_COLORS['text_secondary']};
+            color: {TERMINAL_COLORS['text_secondary']};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 12px;
         }}
         QLabel#matchCount {{
-            color: {APPLE_COLORS['accent']};
+            color: {TERMINAL_COLORS['phosphor']};
+            font-family: {TERMINAL_FONT};
             font-weight: 600;
-            padding: 4px 8px;
-            background: {APPLE_COLORS['accent_subtle']};
+            padding: 4px 10px;
+            background: {TERMINAL_COLORS['phosphor_glow']};
+            border: 1px solid {TERMINAL_COLORS['phosphor_dim']};
             border-radius: 4px;
         }}
     """
 
 
 def get_context_menu_style():
-    """右键菜单 - 毛玻璃感"""
+    """Context menu - Terminal command palette"""
     return f"""
         QMenu {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid {APPLE_COLORS['border']};
-            border-radius: 10px;
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 6px;
             padding: 6px;
-            font-family: {APPLE_FONT_FAMILY};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 13px;
         }}
         QMenu::item {{
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 8px 16px 8px 12px;
+            border-radius: 4px;
             margin: 2px;
         }}
         QMenu::item:selected {{
-            background: {APPLE_COLORS['accent_subtle']};
-            color: {APPLE_COLORS['accent']};
+            background: {TERMINAL_COLORS['phosphor_glow']};
+            color: {TERMINAL_COLORS['phosphor']};
+        }}
+        QMenu::item:disabled {{
+            color: {TERMINAL_COLORS['text_tertiary']};
         }}
         QMenu::separator {{
             height: 1px;
-            background: {APPLE_COLORS['border']};
+            background: {TERMINAL_COLORS['border']};
             margin: 6px 8px;
+        }}
+        QMenu::icon {{
+            margin-left: 8px;
         }}
     """
 
 
 def get_search_dialog_style():
-    """搜索弹窗"""
+    """Advanced search dialog"""
     return f"""
         QDialog {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
-            font-family: {APPLE_FONT_FAMILY};
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
+            font-family: {TERMINAL_FONT_UI};
         }}
 
         QLabel {{
-            color: {APPLE_COLORS['text_primary']};
+            color: {TERMINAL_COLORS['text_primary']};
             font-size: 13px;
         }}
 
         QLineEdit {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid transparent;
-            border-radius: 8px;
+            background: {TERMINAL_COLORS['bg_base']};
+            color: {TERMINAL_COLORS['phosphor']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 10px 14px;
+            font-family: {TERMINAL_FONT};
             font-size: 14px;
         }}
         QLineEdit:focus {{
-            border-color: {APPLE_COLORS['accent']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
 
         QCheckBox, QRadioButton {{
-            color: {APPLE_COLORS['text_primary']};
+            color: {TERMINAL_COLORS['text_primary']};
             font-size: 13px;
             spacing: 8px;
         }}
@@ -527,21 +635,22 @@ def get_search_dialog_style():
             border-radius: 8px;
         }}
         QCheckBox::indicator, QRadioButton::indicator {{
-            border: 1px solid {APPLE_COLORS['text_muted']};
+            border: 1px solid {TERMINAL_COLORS['text_tertiary']};
             background: transparent;
         }}
         QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
-            background: {APPLE_COLORS['accent']};
-            border-color: {APPLE_COLORS['accent']};
+            background: {TERMINAL_COLORS['phosphor']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
 
         QGroupBox {{
-            color: {APPLE_COLORS['text_secondary']};
+            color: {TERMINAL_COLORS['text_secondary']};
             font-size: 11px;
             font-weight: 600;
             letter-spacing: 0.05em;
-            border: 1px solid {APPLE_COLORS['border']};
-            border-radius: 8px;
+            text-transform: uppercase;
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 6px;
             margin-top: 16px;
             padding: 16px 12px;
         }}
@@ -552,81 +661,89 @@ def get_search_dialog_style():
         }}
 
         QPushButton {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 10px 16px;
             font-size: 13px;
             font-weight: 500;
             min-width: 100px;
         }}
         QPushButton:hover {{
-            background: {APPLE_COLORS['text_muted']};
+            background: {TERMINAL_COLORS['bg_active']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
         }}
         QPushButton#primaryBtn {{
-            background: {APPLE_COLORS['accent']};
-            color: #000000;
+            background: {TERMINAL_COLORS['phosphor_dim']};
+            color: {TERMINAL_COLORS['bg_base']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
         QPushButton#primaryBtn:hover {{
-            background: {APPLE_COLORS['accent_hover']};
+            background: {TERMINAL_COLORS['phosphor']};
         }}
 
         QFrame[frameShape="4"] {{
-            background: {APPLE_COLORS['border']};
+            background: {TERMINAL_COLORS['border']};
             max-height: 1px;
         }}
     """
 
 
 def get_grep_filter_bar_style():
-    """Grep 过滤栏"""
+    """Grep filter bar"""
     return f"""
         QFrame {{
-            background: {APPLE_COLORS['bg_surface']};
+            background: {TERMINAL_COLORS['bg_surface']};
             border: none;
+            border-bottom: 1px solid {TERMINAL_COLORS['border']};
             padding: 6px 12px;
         }}
     """
 
 
 def get_grep_tag_style(is_primary=True):
-    """Grep 标签"""
-    color = APPLE_COLORS['success'] if is_primary else APPLE_COLORS['accent']
+    """Grep tags"""
+    color = TERMINAL_COLORS['phosphor'] if is_primary else TERMINAL_COLORS['amber']
+    bg = TERMINAL_COLORS['phosphor_glow'] if is_primary else TERMINAL_COLORS['amber_glow']
     return f"""
         QLabel {{
             color: {color};
+            font-family: {TERMINAL_FONT};
             font-size: 11px;
             font-weight: 500;
             padding: 3px 8px;
-            background: rgba(52, 199, 89, 0.12) if {is_primary} else {APPLE_COLORS['accent_subtle']};
-            border-radius: 4px;
+            background: {bg};
+            border: 1px solid {color};
+            border-radius: 3px;
         }}
     """
 
 
 def get_count_label_style():
-    """计数标签"""
+    """Count labels"""
     return f"""
         QLabel {{
-            color: {APPLE_COLORS['text_secondary']};
+            color: {TERMINAL_COLORS['text_secondary']};
+            font-family: {TERMINAL_FONT};
             font-size: 11px;
             padding: 2px 6px;
-            background: {APPLE_COLORS['bg_hover']};
+            background: {TERMINAL_COLORS['bg_hover']};
             border-radius: 3px;
         }}
     """
 
 
 def get_add_grep_dialog_style():
-    """Add Grep 对话框"""
+    """Add grep dialog"""
     return f"""
         QDialog {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
         }}
         QRadioButton {{
-            color: {APPLE_COLORS['text_primary']};
+            color: {TERMINAL_COLORS['text_primary']};
+            font-family: {TERMINAL_FONT_UI};
             font-size: 13px;
             padding: 8px;
         }}
@@ -634,42 +751,44 @@ def get_add_grep_dialog_style():
             width: 14px;
             height: 14px;
             border-radius: 7px;
-            border: 1px solid {APPLE_COLORS['text_muted']};
+            border: 1px solid {TERMINAL_COLORS['text_tertiary']};
         }}
         QRadioButton::indicator:checked {{
-            background: {APPLE_COLORS['accent']};
-            border-color: {APPLE_COLORS['accent']};
+            background: {TERMINAL_COLORS['phosphor']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
         QDialogButtonBox QPushButton {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 8px 16px;
             font-size: 13px;
             min-width: 72px;
         }}
         QDialogButtonBox QPushButton:hover {{
-            background: {APPLE_COLORS['text_muted']};
+            background: {TERMINAL_COLORS['bg_active']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
         }}
         QDialogButtonBox QPushButton:default {{
-            background: {APPLE_COLORS['accent']};
-            color: #000000;
+            background: {TERMINAL_COLORS['phosphor_dim']};
+            color: {TERMINAL_COLORS['bg_base']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
     """
 
 
 def get_minimap_style():
-    """Minimap - VSCode 风格缩略图"""
+    """Minimap - Code overview"""
     return f"""
         MiniMap {{
-            background: #141416;
+            background: {TERMINAL_COLORS['bg_void']};
             border: none;
-            border-left: 1px solid {APPLE_COLORS['border']};
+            border-left: 1px solid {TERMINAL_COLORS['border']};
         }}
         MiniMap QPlainTextEdit {{
-            background: #141416;
-            color: {APPLE_COLORS['text_tertiary']};
+            background: {TERMINAL_COLORS['bg_void']};
+            color: {TERMINAL_COLORS['text_tertiary']};
             border: none;
             padding: 0;
             margin: 0;
@@ -678,66 +797,68 @@ def get_minimap_style():
 
 
 def get_color_picker_dialog_style():
-    """颜色选择对话框"""
+    """Color picker dialog"""
     return f"""
         QDialog {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
         }}
         QLabel {{
-            color: {APPLE_COLORS['text_primary']};
+            color: {TERMINAL_COLORS['text_primary']};
             font-size: 13px;
         }}
         QPushButton.colorBtn {{
             border: 2px solid transparent;
-            border-radius: 6px;
+            border-radius: 4px;
             min-width: 36px;
             min-height: 36px;
         }}
         QPushButton.colorBtn:hover {{
-            border-color: {APPLE_COLORS['text_secondary']};
+            border-color: {TERMINAL_COLORS['text_secondary']};
         }}
         QPushButton.colorBtn:checked {{
-            border-color: {APPLE_COLORS['accent']};
+            border-color: {TERMINAL_COLORS['phosphor']};
             border-width: 3px;
         }}
         QDialogButtonBox QPushButton {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 8px 16px;
             font-size: 13px;
             min-width: 72px;
         }}
         QDialogButtonBox QPushButton:hover {{
-            background: {APPLE_COLORS['text_muted']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
         }}
         QDialogButtonBox QPushButton:default {{
-            background: {APPLE_COLORS['accent']};
-            color: #000000;
+            background: {TERMINAL_COLORS['phosphor_dim']};
+            color: {TERMINAL_COLORS['bg_base']};
         }}
     """
 
 
 def get_highlight_panel_style():
-    """高亮管理面板"""
+    """Highlight management panel"""
     return f"""
         QDialog {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
         }}
         QLabel {{
-            color: {APPLE_COLORS['text_primary']};
+            color: {TERMINAL_COLORS['text_primary']};
             font-size: 13px;
         }}
         QListWidget {{
-            background: {APPLE_COLORS['bg_surface']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid {APPLE_COLORS['border']};
-            border-radius: 8px;
+            background: {TERMINAL_COLORS['bg_surface']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 6px;
             padding: 4px;
+            font-family: {TERMINAL_FONT};
             font-size: 13px;
+            outline: none;
         }}
         QListWidget::item {{
             padding: 8px 12px;
@@ -745,50 +866,61 @@ def get_highlight_panel_style():
             margin: 2px;
         }}
         QListWidget::item:hover {{
-            background: {APPLE_COLORS['bg_hover']};
+            background: {TERMINAL_COLORS['bg_hover']};
         }}
         QListWidget::item:selected {{
-            background: {APPLE_COLORS['accent_subtle']};
+            background: {TERMINAL_COLORS['phosphor_glow']};
+            color: {TERMINAL_COLORS['phosphor']};
         }}
         QPushButton {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 8px 16px;
             font-size: 13px;
             min-width: 80px;
         }}
         QPushButton:hover {{
-            background: {APPLE_COLORS['text_muted']};
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
+            background: {TERMINAL_COLORS['bg_active']};
         }}
         QPushButton#primaryBtn {{
-            background: {APPLE_COLORS['accent']};
-            color: #000000;
+            background: {TERMINAL_COLORS['phosphor_dim']};
+            color: {TERMINAL_COLORS['bg_base']};
+            border-color: {TERMINAL_COLORS['phosphor']};
+        }}
+        QPushButton#primaryBtn:hover {{
+            background: {TERMINAL_COLORS['phosphor']};
         }}
         QPushButton#dangerBtn {{
-            background: {APPLE_COLORS['error']};
+            background: {TERMINAL_COLORS['error']};
             color: #FFFFFF;
+            border-color: {TERMINAL_COLORS['error']};
         }}
         QLineEdit {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid transparent;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_base']};
+            color: {TERMINAL_COLORS['phosphor']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 8px 12px;
+            font-family: {TERMINAL_FONT};
             font-size: 13px;
         }}
         QLineEdit:focus {{
-            border-color: {APPLE_COLORS['accent']};
+            border-color: {TERMINAL_COLORS['phosphor']};
         }}
         QComboBox {{
-            background: {APPLE_COLORS['bg_hover']};
-            color: {APPLE_COLORS['text_primary']};
-            border: none;
-            border-radius: 6px;
+            background: {TERMINAL_COLORS['bg_hover']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
             padding: 8px 12px;
             font-size: 13px;
             min-width: 120px;
+        }}
+        QComboBox:hover {{
+            border-color: {TERMINAL_COLORS['phosphor_dim']};
         }}
         QComboBox::drop-down {{
             border: none;
@@ -798,24 +930,31 @@ def get_highlight_panel_style():
             image: none;
             border-left: 4px solid transparent;
             border-right: 4px solid transparent;
-            border-top: 5px solid {APPLE_COLORS['text_secondary']};
+            border-top: 5px solid {TERMINAL_COLORS['text_secondary']};
         }}
         QComboBox QAbstractItemView {{
-            background: {APPLE_COLORS['bg_elevated']};
-            color: {APPLE_COLORS['text_primary']};
-            border: 1px solid {APPLE_COLORS['border']};
-            border-radius: 6px;
-            selection-background-color: {APPLE_COLORS['accent_subtle']};
+            background: {TERMINAL_COLORS['bg_elevated']};
+            color: {TERMINAL_COLORS['text_primary']};
+            border: 1px solid {TERMINAL_COLORS['border']};
+            border-radius: 4px;
+            selection-background-color: {TERMINAL_COLORS['phosphor_glow']};
         }}
     """
 
 
-# 导出兼容
-SYSTEM_BLUE = APPLE_COLORS["accent"]
-SYSTEM_GREEN = APPLE_COLORS["success"]
-SYSTEM_RED = APPLE_COLORS["error"]
-BG_PRIMARY = APPLE_COLORS["bg_base"]
-BG_SECONDARY = APPLE_COLORS["bg_surface"]
-BG_TERTIARY = APPLE_COLORS["bg_elevated"]
-LABEL_PRIMARY = APPLE_COLORS["text_primary"]
-LABEL_SECONDARY = APPLE_COLORS["text_secondary"]
+# ============================================================
+# COMPATIBILITY EXPORTS - For backward compatibility
+# ============================================================
+APPLE_COLORS = TERMINAL_COLORS  # Alias for old imports
+APPLE_FONT_FAMILY = TERMINAL_FONT_UI
+APPLE_MONO_FONT = TERMINAL_FONT
+
+# Color exports
+SYSTEM_BLUE = TERMINAL_COLORS["phosphor"]
+SYSTEM_GREEN = TERMINAL_COLORS["success"]
+SYSTEM_RED = TERMINAL_COLORS["error"]
+BG_PRIMARY = TERMINAL_COLORS["bg_base"]
+BG_SECONDARY = TERMINAL_COLORS["bg_surface"]
+BG_TERTIARY = TERMINAL_COLORS["bg_elevated"]
+LABEL_PRIMARY = TERMINAL_COLORS["text_primary"]
+LABEL_SECONDARY = TERMINAL_COLORS["text_secondary"]
